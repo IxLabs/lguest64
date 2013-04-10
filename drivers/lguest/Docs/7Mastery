@@ -1,0 +1,164 @@
+[ drivers/lguest/x86/core.c ]
+/*
+ * There are hooks in the scheduler which we can register to tell when we
+ * get kicked off the CPU (preempt_notifier_register()).  This would allow us
+ * to lazily disable SYSENTER which would regain some performance, and should
+ * also simplify copy_in_guest_info().  Note that we'd still need to restore
+ * things when we exit to Launcher userspace, but that's fairly easy.
+ *
+ * We could also try using these hooks for PGE, but that might be too expensive.
+ *
+ * The hooks were designed for KVM, but we can also put them to good use.
+*/
+
+[ arch/x86/lguest/boot.c ]
+/*
+ * We could be more efficient in our checking of outstanding interrupts, rather
+ * than using a branch.  One way would be to put the "irq_enabled" field in a
+ * page by itself, and have the Host write-protect it when an interrupt comes
+ * in when irqs are disabled.  There will then be a page fault as soon as
+ * interrupts are re-enabled.
+ *
+ * A better method is to implement soft interrupt disable generally for x86:
+ * instead of disabling interrupts, we set a flag.  If an interrupt does come
+ * in, we then disable them for real.  This is uncommon, so we could simply use
+ * a hypercall for interrupt control and not worry about efficiency.
+*/
+
+[ arch/x86/lguest/i386_head.S ]
+/*
+ * When the Host reflects a trap or injects an interrupt into the Guest, it
+ * sets the eflags interrupt bit on the stack based on lguest_data.irq_enabled,
+ * so the Guest iret logic does the right thing when restoring it.  However,
+ * when the Host sets the Guest up for direct traps, such as system calls, the
+ * processor is the one to push eflags onto the stack, and the interrupt bit
+ * will be 1 (in reality, interrupts are always enabled in the Guest).
+ *
+ * This turns out to be harmless: the only trap which should happen under Linux
+ * with interrupts disabled is Page Fault (due to our lazy mapping of vmalloc
+ * regions), which has to be reflected through the Host anyway.  If another
+ * trap *does* go off when interrupts are disabled, the Guest will panic, and
+ * we'll never get to this iret!
+*/
+
+[ drivers/lguest/interrupts_and_traps.c ]
+/*
+ * The Guest has the ability to turn its interrupt gates into trap gates,
+ * if it is careful.  The Host will let trap gates can go directly to the
+ * Guest, but the Guest needs the interrupts atomically disabled for an
+ * interrupt gate.  It can do this by pointing the trap gate at instructions
+ * within noirq_start and noirq_end, where it can safely disable interrupts.
+ */
+
+/*
+ * The Guests do not use the sysenter (fast system call) instruction,
+ * because it's hardcoded to enter privilege level 0 and so can't go direct.
+ * It's about twice as fast as the older "int 0x80" system call, so it might
+ * still be worthwhile to handle it in the Switcher and lcall down to the
+ * Guest.  The sysenter semantics are hairy tho: search for that keyword in
+ * entry.S
+*/
+
+[ drivers/lguest/page_tables.c ]
+/*
+ * get_pfn is slow: we could probably try to grab batches of pages here as
+ * an optimization (ie. pre-faulting).
+*/
+
+/*
+ * We hold reference to pages, which prevents them from being swapped.
+ * It'd be nice to have a callback in the "struct mm_struct" when Linux wants
+ * to swap out.  If we had this, and a shrinker callback to trim PTE pages, we
+ * could probably consider launching Guests as non-root.
+*/
+
+/*
+ * Since we throw away all mappings when a kernel mapping changes, our
+ * performance sucks for guests using highmem.  In fact, a guest with
+ * PAGE_OFFSET 0xc0000000 (the default) and more than about 700MB of RAM is
+ * usually slower than a Guest with less memory.
+ *
+ * This, of course, cannot be fixed.  It would take some kind of... well, I
+ * don't know, but the term "puissant code-fu" comes to mind.
+*/
+
+[ tools/lguest/lguest.c ]
+/*
+ * Inter-guest networking is an interesting area.  Simplest is to have a
+ * --sharenet=<name> option which opens or creates a named pipe.  This can be
+ * used to send packets to another guest in a 1:1 manner.
+ *
+ * More sophisticated is to use one of the tools developed for project like UML
+ * to do networking.
+ *
+ * Faster is to do virtio bonding in kernel.  Doing this 1:1 would be
+ * completely generic ("here's my vring, attach to your vring") and would work
+ * for any traffic.  Of course, namespace and permissions issues need to be
+ * dealt with.  A more sophisticated "multi-channel" virtio_net.c could hide
+ * multiple inter-guest channels behind one interface, although it would
+ * require some manner of hotplugging new virtio channels.
+ *
+ * Finally, we could use a virtio network switch in the kernel, ie. vhost.
+*/
+
+[ drivers/lguest/x86/switcher_32.S ]
+/*
+ * Lguest64 handles NMI.  This gave me NMI envy (until I looked at their
+ * code).  It's worth doing though, since it would let us use oprofile in the
+ * Host when a Guest is running.
+*/
+
+/*
+ * Lguest is meant to be simple: my rule of thumb is that 1% more LOC must
+ * gain at least 1% more performance.  Since neither LOC nor performance can be
+ * measured beforehand, it generally means implementing a feature then deciding
+ * if it's worth it.  And once it's implemented, who can say no?
+ *
+ * This is why I haven't implemented this idea myself.  I want to, but I
+ * haven't.  You could, though.
+ *
+ * The main place where lguest performance sucks is Guest page faulting.  When
+ * a Guest userspace process hits an unmapped page we switch back to the Host,
+ * walk the page tables, find it's not mapped, switch back to the Guest page
+ * fault handler, which calls a hypercall to set the page table entry, then
+ * finally returns to userspace.  That's two round-trips.
+ *
+ * If we had a small walker in the Switcher, we could quickly check the Guest
+ * page table and if the page isn't mapped, immediately reflect the fault back
+ * into the Guest.  This means the Switcher would have to know the top of the
+ * Guest page table and the page fault handler address.
+ *
+ * For simplicity, the Guest should only handle the case where the privilege
+ * level of the fault is 3 and probably only not present or write faults.  It
+ * should also detect recursive faults, and hand the original fault to the
+ * Host (which is actually really easy).
+ *
+ * Two questions remain.  Would the performance gain outweigh the complexity?
+ * And who would write the verse documenting it?
+*/
+
+[ drivers/lguest/hypercalls.c ]
+/*
+ * If a Guest reads from a page (so creates a mapping) that it has never
+ * written to, and then the Launcher writes to it (ie. the output of a virtual
+ * device), the Guest will still see the old page.  In practice, this never
+ * happens: why would the Guest read a page which it has never written to?  But
+ * a similar scenario might one day bite us, so it's worth mentioning.
+ *
+ * Note that if we used a shared anonymous mapping in the Launcher instead of
+ * mapping /dev/zero private, we wouldn't worry about cop-on-write.  And we
+ * need that to switch the Launcher to processes (away from threads) anyway.
+*/
+
+[ tools/lguest/lguest.c ]
+/*
+ * Mastery is done: you now know everything I do.
+ *
+ * But surely you have seen code, features and bugs in your wanderings which
+ * you now yearn to attack?  That is the real game, and I look forward to you
+ * patching and forking lguest into the Your-Name-Here-visor.
+ *
+ * Farewell, and good coding!
+ * Rusty Russell.
+ */
+

@@ -1,0 +1,137 @@
+[ arch/x86/lguest/boot.c ]
+/*
+ * A hypervisor allows multiple Operating Systems to run on a single machine.
+ * To quote David Wheeler: "Any problem in computer science can be solved with
+ * another layer of indirection."
+ *
+ * We keep things simple in two ways.  First, we start with a normal Linux
+ * kernel and insert a module (lg.ko) which allows us to run other Linux
+ * kernels the same way we'd run processes.  We call the first kernel the Host,
+ * and the others the Guests.  The program which sets up and configures Guests
+ * (such as the example in Documentation/virtual/lguest/lguest.c) is called the
+ * Launcher.
+ *
+ * Secondly, we only run specially modified Guests, not normal kernels: setting
+ * CONFIG_LGUEST_GUEST to "y" compiles this file into the kernel so it knows
+ * how to be a Guest at boot time.  This means that you can use the same kernel
+ * you boot normally (ie. as a Host) as a Guest.
+ *
+ * These Guests know that they cannot do privileged operations, such as disable
+ * interrupts, and that they have to ask the Host to do such things explicitly.
+ * This file consists of all the replacements for such low-level native
+ * hardware operations: these special Guest versions call the Host.
+ *
+ * So how does the kernel know it's a Guest?  We'll see that later, but let's
+ * just say that we end up here where we replace the native functions various
+ * "paravirt" structures with our Guest versions, then boot like normal.
+*/
+
+[ drivers/lguest/lguest_device.c ]
+/*
+ * Lguest guests use a very simple method to describe devices.  It's a
+ * series of device descriptors contained just above the top of normal Guest
+ * memory.
+ *
+ * We use the standard "virtio" device infrastructure, which provides us with a
+ * console, a network and a block driver.  Each one expects some configuration
+ * information and a "virtqueue" or two to send and receive data.
+*/
+
+[ tools/lguest/lguest.c ]
+/*
+ * This is the Launcher code, a simple program which lays out the "physical"
+ * memory for the new Guest by mapping the kernel image and the virtual
+ * devices, then opens /dev/lguest to tell the kernel about the Guest and
+ * control it.
+*/
+
+[ drivers/lguest/lguest_user.c ]
+/* This contains all the /dev/lguest code, whereby the userspace
+ * launcher controls and communicates with the Guest.  For example,
+ * the first write will tell us the Guest's memory layout and entry
+ * point.  A read will run the Guest until something happens, such as
+ * a signal or the Guest doing a NOTIFY out to the Launcher.  There is
+ * also a way for the Launcher to attach eventfds to particular NOTIFY
+ * values instead of returning from the read() call.
+*/
+
+[ drivers/lguest/core.c ]
+/*
+ * This contains run_guest() which actually calls into the Host<->Guest
+ * Switcher and analyzes the return, such as determining if the Guest wants the
+ * Host to do something.  This file also contains useful helper routines.
+*/
+
+[ drivers/lguest/x86/core.c ]
+/*
+ * This file contains the x86-specific lguest code.  It used to be all
+ * mixed in with drivers/lguest/core.c but several foolhardy code slashers
+ * wrestled most of the dependencies out to here in preparation for porting
+ * lguest to other architectures (see what I mean by foolhardy?).
+ *
+ * This also contains a couple of non-obvious setup and teardown pieces which
+ * were implemented after days of debugging pain.
+*/
+
+[ drivers/lguest/hypercalls.c ]
+/*
+ * Just as userspace programs request kernel operations through a system
+ * call, the Guest requests Host operations through a "hypercall".  You might
+ * notice this nomenclature doesn't really follow any logic, but the name has
+ * been around for long enough that we're stuck with it.  As you'd expect, this
+ * code is basically a one big switch statement.
+*/
+
+[ drivers/lguest/segments.c ]
+/*
+ * The x86 architecture has segments, which involve a table of descriptors
+ * which can be used to do funky things with virtual address interpretation.
+ * We originally used to use segments so the Guest couldn't alter the
+ * Guest<->Host Switcher, and then we had to trim Guest segments, and restore
+ * for userspace per-thread segments, but trim again for on userspace->kernel
+ * transitions...  This nightmarish creation was contained within this file,
+ * where we knew not to tread without heavy armament and a change of underwear.
+ *
+ * In these modern times, the segment handling code consists of simple sanity
+ * checks, and the worst you'll experience reading this code is butterfly-rash
+ * from frolicking through its parklike serenity.
+*/
+
+[ drivers/lguest/page_tables.c ]
+/*
+ * The pagetable code, on the other hand, still shows the scars of
+ * previous encounters.  It's functional, and as neat as it can be in the
+ * circumstances, but be wary, for these things are subtle and break easily.
+ * The Guest provides a virtual to physical mapping, but we can neither trust
+ * it nor use it: we verify and convert it here then point the CPU to the
+ * converted Guest pages when running the Guest.
+*/
+
+[ drivers/lguest/interrupts_and_traps.c ]
+/*
+ * Interrupts (traps) are complicated enough to earn their own file.
+ * There are three classes of interrupts:
+ *
+ * 1) Real hardware interrupts which occur while we're running the Guest,
+ * 2) Interrupts for virtual devices attached to the Guest, and
+ * 3) Traps and faults from the Guest.
+ *
+ * Real hardware interrupts must be delivered to the Host, not the Guest.
+ * Virtual interrupts must be delivered to the Guest, but we make them look
+ * just like real hardware would deliver them.  Traps from the Guest can be set
+ * up to go directly back into the Guest, but sometimes the Host wants to see
+ * them first, so we also have a way of "reflecting" them into the Guest as if
+ * they had been delivered to it directly.
+*/
+
+[ drivers/lguest/x86/switcher_32.S ]
+/*
+ * This is the Switcher: code which sits at 0xFFC00000 (or 0xFFE00000) astride
+ * both the Host and Guest to do the low-level Guest<->Host switch.  It is as
+ * simple as it can be made, but it's naturally very specific to x86.
+ *
+ * You have now completed Preparation.  If this has whet your appetite; if you
+ * are feeling invigorated and refreshed then the next, more challenging stage
+ * can be found in "make Guest".
+ */
+
