@@ -1,22 +1,8 @@
-# Guest requires the paravirt_ops replacement and the bus driver.
-obj-$(CONFIG_LGUEST_GUEST) += lguest.o lguest_asm.o
+KDIR = /lib/modules/`uname -r`/build
 
-# Host requires the other files, which can be a module.
-obj-$(CONFIG_LGUEST)	+= lg.o
-lg-objs :=  page_tables.o core.o switcher.o lguest_user.o \
-hypercalls.o ../io.o interrupts_and_traps.o lguest_debug.o \
-lguest_stat.o
+kbuild:
+	make -C $(KDIR) M=`pwd`
 
-# We use top 4MB for guest traps page, then hypervisor. */
-HYPE_ADDR := (0xFFC00000+4096)
-# The data is only 1k (256 interrupt handler pointers)
-HYPE_DATA_SIZE := 1024
-CFLAGS += -DHYPE_ADDR="$(HYPE_ADDR)" -DHYPE_DATA_SIZE="$(HYPE_DATA_SIZE)"
-
-##$(obj)/core.o: $(obj)/hypervisor-blob.c
-### This links the hypervisor in the right place and turns it into a C array.
-##$(obj)/hypervisor-raw: $(obj)/hypervisor.o
-##	@$(LD) -static -Tdata=`printf %#x $$(($(HYPE_ADDR)))` -Ttext=`printf %#x $$(($(HYPE_ADDR)+$(HYPE_DATA_SIZE)))` -o $@ $< && $(OBJCOPY) -O binary $@
-##$(obj)/hypervisor-blob.c: $(obj)/hypervisor-raw
-##	@od -tx1 -An -v $< | sed -e 's/^ /0x/' -e 's/$$/,/' -e 's/ /,0x/g' > $@
-
+clean:
+	make -C $(KDIR) M=`pwd` clean
+	-rm -f *~ Module.symvers modules.order
