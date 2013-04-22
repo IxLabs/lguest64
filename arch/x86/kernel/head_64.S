@@ -46,7 +46,7 @@ L3_START_KERNEL = pud_index(__START_KERNEL_map)
 	__HEAD
 	.code64
 	.globl startup_64
-startup_64:
+ENTRY(startup_64)
 	/*
 	 * At this point the CPU runs in 64bit mode CS.L = 1 CS.D = 1,
 	 * and someone has loaded an identity mapped page table
@@ -154,7 +154,42 @@ startup_64:
 
 	/* Fixup phys_base */
 	addq	%rbp, phys_base(%rip)
+#ifdef CONFIG_PARAVIRT
+    /* This is can only trip for a broken bootloader... */
+    cmpw $0x207, boot_params + BP_version - __START_KERNEL_map /* FIXME */
+    jb default_entry
 
+    /* Paravirt-compatible boot parameters.  Look to see what architecture
+       we're booting under. */
+    movq boot_params + BP_hardware_subarch - __START_KERNEL_map, %rax
+    cmpq $num_subarch_entries, %rax
+    jae bad_subarch
+
+    movq subarch_entries - __START_KERNEL_map(,%rax,8), %rax
+    subq $__START_KERNEL_map, %rax
+    jmp *%rax
+
+bad_subarch:
+WEAK(lguest_entry)
+    /* Unknown implementation; there's really
+       nothing we can do at this point. */
+    ud2a
+
+    __INITDATA
+
+    /* FIXME */
+    subarch_entries:
+    .quad default_entry     /* normal x86/PC */
+    .quad lguest_entry      /* lguest64 hypervisor */
+    /* we don't need this */
+    /* .quad default_entry      Moorestown MID */
+    num_subarch_entries = (. - subarch_entries) / 8
+    .previous
+#else
+    jmp default_entry
+#endif /* CONFIG_PARAVIRT */
+
+default_entry:
 	movq	$(early_level4_pgt - __START_KERNEL_map), %rax
 	jmp 1f
 ENTRY(secondary_startup_64)

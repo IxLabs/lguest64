@@ -1,5 +1,6 @@
 #include <asm/ia32.h>
-
+#include <linux/lguest.h>
+#include "../../../drivers/lguest/lg.h"
 #define __SYSCALL_64(nr, sym, compat) [nr] = 1,
 #define __SYSCALL_COMMON(nr, sym, compat) [nr] = 1,
 #ifdef CONFIG_X86_X32_ABI
@@ -85,5 +86,106 @@ int main(void)
 	DEFINE(__NR_ia32_syscall_max, sizeof(syscalls_ia32) - 1);
 	DEFINE(IA32_NR_syscalls, sizeof(syscalls_ia32));
 
-	return 0;
+#if defined(CONFIG_LGUEST) || defined(CONFIG_LGUEST_GUEST)
+#define ENTRY(entry)  DEFINE(LG_CPU_##entry, offsetof(struct lg_cpu, entry))
+    /* Used for offset of GS reg in syscall */
+    DEFINE(LG_CPU_regs_rsp, offsetof(struct lg_cpu, regs.rsp));
+    DEFINE(LG_CPU_regs_rax, offsetof(struct lg_cpu, regs.rax));
+    DEFINE(LG_CPU_regs_rdx, offsetof(struct lg_cpu, regs.rdx));
+    DEFINE(LG_CPU_regs_rcx, offsetof(struct lg_cpu, regs.rcx));
+    /* Used in interrupt handling */
+    DEFINE(LG_CPU_trapnum, offsetof(struct lg_cpu, regs.trapnum));
+    /* Used for page faulting */
+    DEFINE(LG_CPU_errcode, offsetof(struct lg_cpu, regs.errcode));
+    ENTRY(cpu_hv);
+    ENTRY(cpu);
+    ENTRY(regs);
+    ENTRY(debug);
+    ENTRY(magic);
+    ENTRY(host_stack);
+    ENTRY(gcr3);
+    ENTRY(guest_cr3);
+    ENTRY(host_cr3);
+    ENTRY(host_gs_a);
+    ENTRY(host_gs_d);
+    ENTRY(host_proc_gs_a);
+    ENTRY(host_proc_gs_d);
+    ENTRY(hv_gdt);
+    ENTRY(gdt);
+    ENTRY(idt);
+    ENTRY(page_fault_handler);
+    ENTRY(page_fault_clear_if);
+    ENTRY(host_gdt);
+    ENTRY(host_idt);
+    ENTRY(host_gdt_ptr);
+    ENTRY(gdt_table);
+    DEFINE(LG_CPU_host_idt_address, offsetof(struct lg_cpu, host_idt.address));
+#undef ENTRY
+#define ENTRY(entry)  DEFINE(LG_CPU_DATA_##entry, offsetof(struct lg_cpu_data, entry))
+    ENTRY(df_stack_end);
+    ENTRY(nmi_regs);
+    ENTRY(nmi_vcpu);
+    ENTRY(flags);
+    ENTRY(cr2);
+    ENTRY(tss_rsp0);
+    ENTRY(LSTAR);
+    ENTRY(SFMASK);
+    ENTRY(irq_enabled);
+    ENTRY(last_pgd);
+    ENTRY(last_rip);
+    ENTRY(last_vaddr);
+    ENTRY(guest_fs_a);
+    ENTRY(guest_fs_d);
+    ENTRY(guest_gs_a);
+    ENTRY(guest_gs_d);
+    ENTRY(guest_gs_shadow_a);
+    ENTRY(guest_gs_shadow_d);
+    ENTRY(old_ss);
+    ENTRY(nmi_gs_a);
+    ENTRY(nmi_gs_d);
+    ENTRY(nmi_gs_shadow_a);
+    ENTRY(nmi_gs_shadow_d);
+    ENTRY(nmi_stack_end);
+    ENTRY(nmi_gdt);
+#undef ENTRY
+#define ENTRY(entry)  DEFINE(LGUEST_REGS_##entry, offsetof(struct lguest_regs, entry))
+    ENTRY(rsp);
+    ENTRY(errcode);
+    ENTRY(rip);
+    ENTRY(size);
+    ENTRY(cs);
+    ENTRY(ss);
+    ENTRY(rax);
+    ENTRY(rdx);
+    ENTRY(r11);
+    ENTRY(rflags);
+    BLANK();
+    //FIXME
+    //Nu inteleg nimic din calculul asta
+    DEFINE(LG_CPU_save_rsp,
+           ((sizeof(struct lg_cpu)+(PAGE_SIZE-1)) & ~(PAGE_SIZE-1)) +
+           offsetof(struct lg_cpu, regs.rsp));
+#undef ENTRY
+
+   BLANK();
+   OFFSET(LGUEST_DATA_irq_enabled, lguest_data, irq_enabled);
+   OFFSET(LGUEST_DATA_irq_pending, lguest_data, irq_pending);
+#if 0
+   OFFSET(LGUEST_DATA_pgdir, lguest_data, pgdir);
+
+   BLANK();
+
+   OFFSET(LGUEST_PAGES_host_gdt_desc, lguest_pages, state.host_gdt_desc);
+   OFFSET(LGUEST_PAGES_host_idt_desc, lguest_pages, state.host_idt_desc);
+   OFFSET(LGUEST_PAGES_host_cr3, lguest_pages, state.host_cr3);
+   OFFSET(LGUEST_PAGES_host_sp, lguest_pages, state.host_sp);
+   OFFSET(LGUEST_PAGES_guest_gdt_desc, lguest_pages,state.guest_gdt_desc);
+   OFFSET(LGUEST_PAGES_guest_idt_desc, lguest_pages,state.guest_idt_desc);
+   OFFSET(LGUEST_PAGES_guest_gdt, lguest_pages, state.guest_gdt);
+   OFFSET(LGUEST_PAGES_regs_trapnum, lguest_pages, regs.trapnum);
+   OFFSET(LGUEST_PAGES_regs_errcode, lguest_pages, regs.errcode);
+   OFFSET(LGUEST_PAGES_regs, lguest_pages, regs);
+#endif
+#endif
+   return 0;
 }

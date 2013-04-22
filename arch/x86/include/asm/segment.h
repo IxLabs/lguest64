@@ -144,7 +144,7 @@
 #define SEGMENT_IS_PNP_CODE(x)   (((x) & 0xf4) == GDT_ENTRY_PNPBIOS_BASE * 8)
 
 
-#else
+#else /* CONFIG_X86_32 */
 #include <asm/cache.h>
 
 #define GDT_ENTRY_KERNEL32_CS 1
@@ -182,7 +182,7 @@
 
 #define GDT_ENTRIES 16
 
-#endif
+#endif /* CONFIG_X86_32 */
 
 #define __KERNEL_CS	(GDT_ENTRY_KERNEL_CS*8)
 #define __KERNEL_DS	(GDT_ENTRY_KERNEL_DS*8)

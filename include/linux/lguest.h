@@ -4,7 +4,6 @@
  */
 #ifndef _LINUX_LGUEST_H
 #define _LINUX_LGUEST_H
-
 #ifndef __ASSEMBLY__
 #include <linux/time.h>
 #include <asm/irq.h>
@@ -58,7 +57,7 @@ struct lguest_data {
 	/* Memory not to try to access */
 	unsigned long reserve_mem;
 	/* KHz for the TSC clock. */
-	u32 tsc_khz;
+	unsigned long tsc_khz;
 
 /* Fields initialized by the Guest at boot: */
 	/* Instruction range to suppress interrupts even if enabled */
@@ -67,7 +66,44 @@ struct lguest_data {
 	unsigned long kernel_address;
 	/* The vector to try to use for system calls (0x40 or 0x80). */
 	unsigned int syscall_vec;
+#if 0
 };
+
+
+//TODO - this is the new lguest_data
+//probably I have to merge it with the old one
+//and eliminate/add a few values
+
+/* Fields initialized by the hypervisor at boot: (per guest info) */
+struct lguest_data
+{
+#endif
+	/* ID of this guest (used by network driver to set ethernet address) */
+	u32 guestid;
+
+/* Fields initialized by the guest at boot: */
+
+	unsigned long start_kernel_map;
+	unsigned long page_offset;
+	unsigned long text; /* pa address of lguest_text_ptr addresses */
+
+	unsigned long startup_routine;
+	unsigned long initial_stack;
+
+	unsigned long irq0_vector;
+
+	/* Address of the VCPU HV guest shared RW data */
+	unsigned long vcpu_shared_data;
+
+/* If the kernel has kallsyms, we can use it to do backtraces of a guest */
+	unsigned long kallsyms_addresses;
+	unsigned long kallsyms_num_syms;
+	unsigned long kallsyms_names;
+	unsigned long kallsyms_token_table;
+	unsigned long kallsyms_token_index;
+	unsigned long kallsyms_markers;
+};
+
 extern struct lguest_data lguest_data;
 #endif /* __ASSEMBLY__ */
 #endif	/* _LINUX_LGUEST_H */

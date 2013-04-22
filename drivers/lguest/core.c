@@ -185,7 +185,7 @@ void __lgread(struct lg_cpu *cpu, void *b, unsigned long addr, unsigned bytes)
 	    || copy_from_user(b, cpu->lg->mem_base + addr, bytes) != 0) {
 		/* copy_from_user should do this, but as we rely on it... */
 		memset(b, 0, bytes);
-		kill_guest(cpu, "bad read address %#lx len %u", addr, bytes);
+		kill_guest(cpu->lg, "bad read address %#lx len %u", addr, bytes);
 	}
 }
 
@@ -195,7 +195,7 @@ void __lgwrite(struct lg_cpu *cpu, unsigned long addr, const void *b,
 {
 	if (!lguest_address_ok(cpu->lg, addr, bytes)
 	    || copy_to_user(cpu->lg->mem_base + addr, b, bytes) != 0)
-		kill_guest(cpu, "bad write address %#lx len %u", addr, bytes);
+		kill_guest(cpu->lg, "bad write address %#lx len %u", addr, bytes);
 }
 /*:*/
 
@@ -339,7 +339,9 @@ static int __init init(void)
 		goto free_interrupts;
 
 	/* Finally we do some architecture-specific setup. */
-	lguest_arch_host_init();
+	err = lguest_arch_host_init();
+    if (err)
+        goto free_interrupts;
 
 	/* All good! */
 	return 0;

@@ -1,2 +1,2 @@
-obj-y		:= i386_head.o boot.o
+obj-y		:= head_$(BITS).o boot_$(BITS).o
 CFLAGS_boot.o	:= $(call cc-option, -fno-stack-protector)

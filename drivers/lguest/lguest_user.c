@@ -209,7 +209,7 @@ static ssize_t read(struct file *file, char __user *user, size_t size,loff_t*o)
 		return -EINVAL;
 
 	/* Watch out for arbitrary vcpu indexes! */
-	if (cpu_id >= lg->nr_cpus)
+	if (cpu_id >= atomic_read(&lg->nr_cpus))
 		return -EINVAL;
 
 	cpu = &lg->cpus[cpu_id];
@@ -257,7 +257,7 @@ static int lg_cpu_start(struct lg_cpu *cpu, unsigned id, unsigned long start_ip)
 	/* Set up this CPU's id, and pointer back to the lguest struct. */
 	cpu->id = id;
 	cpu->lg = container_of((cpu - id), struct lguest, cpus[0]);
-	cpu->lg->nr_cpus++;
+	atomic_inc(&cpu->lg->nr_cpus);
 
 	/* Each CPU has a timer it can set. */
 	init_clockdev(cpu);
@@ -418,7 +418,7 @@ static ssize_t write(struct file *file, const char __user *in,
 
 	/* If you haven't initialized, you must do that first. */
 	if (req != LHREQ_INITIALIZE) {
-		if (!lg || (cpu_id >= lg->nr_cpus))
+		if (!lg || (cpu_id >= atomic_read(&lg->nr_cpus)))
 			return -EINVAL;
 		cpu = &lg->cpus[cpu_id];
 
@@ -466,7 +466,7 @@ static int close(struct inode *inode, struct file *file)
 	/* Free up the shadow page tables for the Guest. */
 	free_guest_pagetable(lg);
 
-	for (i = 0; i < lg->nr_cpus; i++) {
+	for (i = 0; i < atomic_read(&lg->nr_cpus); i++) {
 		/* Cancels the hrtimer set via LHCALL_SET_CLOCKEVENT. */
 		hrtimer_cancel(&lg->cpus[i].hrt);
 		/* We can free up the register page we allocated. */
