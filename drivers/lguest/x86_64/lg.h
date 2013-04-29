@@ -185,7 +185,9 @@ struct lg_cpu {
 
 	/* Must be 16 bytes aligned at regs+sizeof(regs) */
 	unsigned long regs_page;
-	struct lguest_regs regs;
+	struct lguest_regs *regs;
+
+	struct lguest_pages *last_pages;
 
 	unsigned long cpu_hv; /* pointer to guest vcpu (RO) in HV land */
 	struct lg_cpu *cpu; /* pointer to itself */
@@ -519,7 +521,8 @@ void guest_pagetable_clear_all(struct lg_cpu *cpu);
 void guest_pagetable_flush_user(struct lg_cpu *cpu);
 void guest_new_pagetable(struct lg_cpu *cpu, u64 cr3);
 
-int init_guest_pagetable(struct lguest *lg, u64 pgtable);
+int init_guest_pagetable(struct lguest *lg/*, u64 pgtable*/);
+void free_guest_pagetable(struct lguest *lg);
 int lguest_init_vcpu_pagetable(struct lg_cpu *cpu);
 int lguest_setup_guest_pages(struct lg_cpu *cpu);
 void lguest_add_vm_shrinker(void);

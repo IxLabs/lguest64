@@ -36,8 +36,8 @@ void lguest_stat_return_to_host(struct lg_cpu *cpu)
 	unsigned long cnt;
 
 	spin_lock(&lguest_stat_lock);
-	if (cpu->regs.trapnum == LGUEST_TRAP_ENTRY) {
-		cnt = cpu->regs.rax;
+	if (cpu->regs->trapnum == LGUEST_TRAP_ENTRY) {
+		cnt = cpu->regs->rax;
 		if (unlikely(cnt > LGUEST_MAX_HCALLS))
 			cnt = LGUEST_MAX_HCALLS;
 		lg->stat_hcalls[cnt]++;
@@ -45,7 +45,7 @@ void lguest_stat_return_to_host(struct lg_cpu *cpu)
 		cpu->stat_cause = STAT_HCALL(cnt);
 	}
 
-	cnt = cpu->regs.trapnum;
+	cnt = cpu->regs->trapnum;
 
 	if (cnt != LGUEST_TRAP_ENTRY)
 		cpu->stat_cause = STAT_TRAP(cnt);

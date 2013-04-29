@@ -37,8 +37,8 @@ void lguest_force_trap(struct lg_cpu *cpu)
 	struct lguest *lg = cpu->lg;
 	printk("forcing trap %d\n", lg->trap);
 	lguest_dump_vcpu_regs(cpu);
-	cpu->regs.trapnum = lg->trap;
-	cpu->regs.errcode = lg->err;
+	cpu->regs->trapnum = lg->trap;
+	cpu->regs->errcode = lg->err;
 
 	reflect_trap(cpu, lg->trap, trap_has_err(lg->trap));
 	lg->trap = 0;
@@ -47,7 +47,7 @@ void lguest_force_trap(struct lg_cpu *cpu)
 int reflect_trap(struct lg_cpu *cpu, int trap_num, int has_err)
 {
 	struct lguest *lg = cpu->lg;
-	struct lguest_regs *regs = &cpu->regs;
+	struct lguest_regs *regs = cpu->regs;
 	u64 __user *gstack;
 	u64 rflags, irq_enable;
 	u64 offset;
@@ -146,7 +146,7 @@ void maybe_do_interrupt(struct lg_cpu *cpu)
 		lg->halted = 0;
 	} else {
 		lgdebug_lprint(LGD_IRQ_FL, "send irq: %d  rip %llx (%s)\n",
-			       irq, cpu->regs.rip,
+			       irq, cpu->regs->rip,
 			       cpu->lg_cpu_data->irq_enabled ? "maybe": "not yet");
 
 		/* Maybe they have interrupts disabled? */
@@ -154,8 +154,8 @@ void maybe_do_interrupt(struct lg_cpu *cpu)
 			return;
 
 		/* Or maybe, they are in a too-critical place to handle it */
-		if ((cpu->regs.rip >= lg->noirq_start) &&
-		   (cpu->regs.rip <= lg->noirq_end)) {
+		if ((cpu->regs->rip >= lg->noirq_start) &&
+		   (cpu->regs->rip <= lg->noirq_end)) {
 			return;
 		}
 		/*
@@ -168,13 +168,13 @@ void maybe_do_interrupt(struct lg_cpu *cpu)
 		 */
 		if (cpu->lg_cpu_data->irq_enabled & LGUEST_IRQ_HOLD_BIT) {
 			lgdebug_lprint(LGD_IRQ_FL, "   On hold, rip is in %s\n",
-				       (cpu->regs.cs & 3) == 1 ?
+				       (cpu->regs->cs & 3) == 1 ?
 				       "kernel": "userspace");
 			/*
 			 * If we are still in the kernel, ignore it.
 			 * Otherwise, clear the bit and send.
 			 */
-			if ((cpu->regs.cs & 3) == 1)
+			if ((cpu->regs->cs & 3) == 1)
 				return;
 
 			cpu->lg_cpu_data->irq_enabled &= ~LGUEST_IRQ_HOLD_BIT;

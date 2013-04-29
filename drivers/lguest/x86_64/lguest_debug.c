@@ -20,6 +20,8 @@
 #include <linux/sched.h>
 #include <linux/freezer.h>
 #include <linux/kallsyms.h>
+#include <linux/lguest.h>
+#include <linux/slab.h>
 #include <asm/paravirt.h>
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
@@ -87,7 +89,7 @@ void lgdebug_lvprint(unsigned flags, const char *fmt, va_list ap)
 
 void lguest_dump_vcpu_regs(struct lg_cpu *cpu)
 {
-	struct lguest_regs *regs = &cpu->regs;
+	struct lguest_regs *regs = cpu->regs;
 	unsigned long gs, shadow_gs;
 	unsigned long cr2, data_cr2;
 	unsigned long stack;
@@ -105,7 +107,7 @@ void lguest_dump_vcpu_regs(struct lg_cpu *cpu)
 	lguest_print_address(cpu, regs->rip);
 	printk("RSP: %04llx:%016llx  EFLAGS: %08llx irqs %s\n", regs->ss, regs->rsp,
 	       regs->rflags,
-	       cpu->cpu_data->irq_enabled?"enabled":"disabled");
+	       cpu->lg_cpu_data->irq_enabled?"enabled":"disabled");
 	printk("RAX: %016llx RBX: %016llx RCX: %016llx\n",
 	       regs->rax, regs->rbx, regs->rcx);
 	printk("RDX: %016llx RSI: %016llx RDI: %016llx\n",
@@ -117,19 +119,19 @@ void lguest_dump_vcpu_regs(struct lg_cpu *cpu)
 	printk("R13: %016llx R14: %016llx R15: %016llx\n",
 	       regs->r13, regs->r14, regs->r15);
 	printk("FS %04llx: Base: %016lx  Desc: %08lx\n",
-	       regs->fs,(cpu->cpu_data->guest_fs_a |
-			(cpu->cpu_data->guest_fs_d << 32)), 
-			(cpu->cpu_data->guest_fs_desc_a |
-			(cpu->cpu_data->guest_fs_desc_d << 32)));
+	       regs->fs,(cpu->lg_cpu_data->guest_fs_a |
+			(cpu->lg_cpu_data->guest_fs_d << 32)), 
+			(cpu->lg_cpu_data->guest_fs_desc_a |
+			(cpu->lg_cpu_data->guest_fs_desc_d << 32)));
 
-	data_cr2 = cpu->cpu_data->cr2;
+	data_cr2 = cpu->lg_cpu_data->cr2;
 
 	SAVE_CR2(cr2);
 	printk(" CR2: %lx  lg_cpu_data->cr2: %lx\n", cr2, data_cr2);
 	
-	gs = (u32)cpu->cpu_data->guest_gs_a | (cpu->cpu_data->guest_gs_d << 32);
-	shadow_gs = (u32)cpu->cpu_data->guest_gs_shadow_a |
-		(cpu->cpu_data->guest_gs_shadow_d << 32);
+	gs = (u32)cpu->lg_cpu_data->guest_gs_a | (cpu->lg_cpu_data->guest_gs_d << 32);
+	shadow_gs = (u32)cpu->lg_cpu_data->guest_gs_shadow_a |
+		(cpu->lg_cpu_data->guest_gs_shadow_d << 32);
 	printk(" GS Base: %016lx  Shadow: %016lx\n",
 	       gs, shadow_gs);
 
@@ -446,7 +448,7 @@ static const char *lguest_syms_lookup(struct lg_cpu *cpu,
 	}
 
 	/* see if it's in a module */
-	msym = module_address_lookup(addr, symbolsize, offset, modname);
+	msym = module_address_lookup(addr, symbolsize, offset, modname, namebuf);
 	if (msym) {
 		kfree(kstuff.addresses);
 		return strncpy(namebuf, msym, KSYM_NAME_LEN);
@@ -489,13 +491,13 @@ void lguest_dump_trace(struct lg_cpu *cpu, struct lguest_regs *regs)
 	struct lguest_text_ptr *segs;
 
 	printk("Stack Trace:\n");
-	if (stack < cpu->guest->page_offset) {
+	if (stack < cpu->lg->page_offset) {
 		printk("  <USER STACK>\n");
 		goto out;
 	}
 
-	start_kernel_map = cpu->guest->start_kernel_map;
-	page_offset = cpu->guest->page_offset;
+	start_kernel_map = cpu->lg->start_kernel_map;
+	page_offset = cpu->lg->page_offset;
 
 	segs = get_text_segs(cpu);
 	if (!segs)
@@ -516,7 +518,7 @@ out:
 
 static u64 read_page(struct lg_cpu *cpu, u64 page, u64 idx)
 {
-	struct lguest *lg = cpu->guest;
+	struct lguest *lg = cpu->lg;
 	u64 *ptr;
 
 	if (!cpu) {
@@ -700,7 +702,7 @@ static int lguest_test_pte(struct lg_cpu *cpu, int pgd_idx, int pud_idx,
 				       cpu->pgd->hcr3,
 				       vaddr);
 				printk("rip=");
-				lguest_print_address(cpu, cpu->regs.rip);
+				lguest_print_address(cpu, cpu->regs->rip);
 				printk(" (%lx) pte[%x] = %llx\n",
 				       __pa(pte), p, pte[p]);
 				check = 0;
@@ -718,7 +720,7 @@ static int lguest_test_pte(struct lg_cpu *cpu, int pgd_idx, int pud_idx,
 				       gpaddr, paddr,
 				       pgprot_val(prot), pte[p] & ~PTE_MASK);
 				printk("rip=");
-				lguest_print_address(cpu, cpu->regs.rip);
+				lguest_print_address(cpu, cpu->regs->rip);
 				printk(" (%lx) pte[%x] = %llx\n",
 				       __pa(pte), p, pte[p]);
 				return -1;

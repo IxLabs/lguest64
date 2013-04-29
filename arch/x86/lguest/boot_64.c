@@ -236,11 +236,11 @@ static void lguest_idle(void)
 static unsigned long save_fl(void)
 {
 	unsigned long flags = 0;
-/*	asm volatile (
+	asm volatile (
 		"movq " __stringify(LG_CPU_DATA_irq_enabled)"(%0), %0\n"
 		: "=a" (flags)
 		: "0" (lguest_data_vcpu));
-*/	return flags;
+	return flags;
 }
 
 static void lg_restore_fl(unsigned long flags)
@@ -249,7 +249,7 @@ static void lg_restore_fl(unsigned long flags)
 	 * Now we need to be careful in testing for
 	 * irqs pending.
 	 */
-/*	asm volatile (
+	asm volatile (
 		"movq %0,"__stringify(LG_CPU_DATA_irq_enabled)"(%1)\n"
 
 		"testq %2,"
@@ -262,24 +262,24 @@ static void lg_restore_fl(unsigned long flags)
 		:
 		: "D" (flags),
 		  "a" (lguest_data_vcpu), "i" (LG_CPU_IRQPEND_FL));
-*/}
+}
 
 static void lguest_irq_disable(void)
 {
-/*	asm volatile (
+	asm volatile (
 		"movq $0," __stringify(LG_CPU_DATA_irq_enabled)"(%0)\n"
 		:: "a" (lguest_data_vcpu));
-*/
+
 }
 
 
 static void lguest_irq_enable(void)
 {
 	asm volatile (
-/*		"movq $512," __stringify(LG_CPU_DATA_irq_enabled)"(%0)\n"
+		"movq $512," __stringify(LG_CPU_DATA_irq_enabled)"(%0)\n"
 		"testq %1,"
 		__stringify(LG_CPU_DATA_flags)"(%0)\n"
-*/
+
 		"jz 1f\n"
 		"movq  $" __stringify(LHCALL_S2H) ", %%rax\n"
 		"int   $" __stringify(LGUEST_TRAP_ENTRY) "\n"

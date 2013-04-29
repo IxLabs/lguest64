@@ -89,14 +89,20 @@ int main(void)
 #if defined(CONFIG_LGUEST) || defined(CONFIG_LGUEST_GUEST)
 #define ENTRY(entry)  DEFINE(LG_CPU_##entry, offsetof(struct lg_cpu, entry))
     /* Used for offset of GS reg in syscall */
-    DEFINE(LG_CPU_regs_rsp, offsetof(struct lg_cpu, regs.rsp));
-    DEFINE(LG_CPU_regs_rax, offsetof(struct lg_cpu, regs.rax));
-    DEFINE(LG_CPU_regs_rdx, offsetof(struct lg_cpu, regs.rdx));
-    DEFINE(LG_CPU_regs_rcx, offsetof(struct lg_cpu, regs.rcx));
+    //FIXME
+    //Cred ca toate calculele trebuie refacute pentru ca acum am schimbat
+    //locatia lui regs; Ei se mapeaza undeva la sfarsitul memoriei - nu mai
+    //sunt in structura lg_cpu, ci doar se tine un pointer la ei
+    //
+    //Las numele tot asa pana imi dau seama ce-i cu ei
+    DEFINE(LG_CPU_regs_rsp, offsetof(struct lguest_regs, rsp));
+    DEFINE(LG_CPU_regs_rax, offsetof(struct lguest_regs, rax));
+    DEFINE(LG_CPU_regs_rdx, offsetof(struct lguest_regs, rdx));
+    DEFINE(LG_CPU_regs_rcx, offsetof(struct lguest_regs, rcx));
     /* Used in interrupt handling */
-    DEFINE(LG_CPU_trapnum, offsetof(struct lg_cpu, regs.trapnum));
+    DEFINE(LG_CPU_trapnum, offsetof(struct lguest_regs, trapnum));
     /* Used for page faulting */
-    DEFINE(LG_CPU_errcode, offsetof(struct lg_cpu, regs.errcode));
+    DEFINE(LG_CPU_errcode, offsetof(struct lguest_regs, errcode));
     ENTRY(cpu_hv);
     ENTRY(cpu);
     ENTRY(regs);
@@ -163,8 +169,8 @@ int main(void)
     //FIXME
     //Nu inteleg nimic din calculul asta
     DEFINE(LG_CPU_save_rsp,
-           ((sizeof(struct lg_cpu)+(PAGE_SIZE-1)) & ~(PAGE_SIZE-1)) +
-           offsetof(struct lg_cpu, regs.rsp));
+           ((sizeof(struct lguest_regs)+(PAGE_SIZE-1)) & ~(PAGE_SIZE-1)) +
+           offsetof(struct lguest_regs, rsp));
 #undef ENTRY
 
    BLANK();

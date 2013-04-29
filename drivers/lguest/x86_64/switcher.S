@@ -6,6 +6,11 @@
 #include "lg.h"
 #include "debug_switcher.h"
 
+//FIXME - definitii facute de mine dupa
+//cum erau in kernelul 2.6
+#define __HV_CS 0x80
+#define __HV_DS 0x88
+
 .text
 .align PAGE_SIZE
 ENTRY(start_switcher_text)
@@ -329,7 +334,7 @@ switch_to_guest:
 	lgdt LG_CPU_hv_gdt(%rdi)
 
 	/* Load the pointer to the vcpu data when in the guest cr3 to r12 */
-	movq	LG_CPU_vcpu_hv(%rdi), %r12;
+	movq	LG_CPU_cpu_hv(%rdi), %r12;
 
 	/* switch to the guests page tables */
 	movq	LG_CPU_guest_cr3(%rdi), %rax
@@ -394,7 +399,7 @@ switch_to_guest:
 	/* Load the host page tables since that's where the gdt is */	\
 	movq    LG_CPU_host_cr3(%rdi), %rax;			\
 	/* Make the rdi point to the hosts version of the vcpu struct */ \
-	movq	LG_CPU_vcpu(%rdi), %rdi ;				\
+	movq	LG_CPU_cpu(%rdi), %rdi ;				\
 	movq    %rax, %cr3;						\
 	/* Put back the host process gs */				\
 	movl  	$MSR_KERNEL_GS_BASE,%ecx;				\
@@ -414,7 +419,7 @@ switch_to_guest:
 	/* With PDA back now switch to host idt */			\
 	lidt    LG_CPU_host_idt(%rdi);				\
 	/* Set guest's TSS to available (clear byte 5 bit 2). */	\
-	movq    LG_CPU_vcpu(%rdi), %rax;				\
+	movq    LG_CPU_cpu(%rdi), %rax;				\
 	andb	$0xFD, (LG_CPU_gdt_table+GDT_ENTRY_TSS*8+5)(%rax);	\
 	movq	LG_CPU_host_stack(%rdi), %rsp;			\
 	RESTORE_REGS;							\
@@ -620,12 +625,12 @@ fault_back_to_host:
 	/*       0   or   1      =    1		*/
 	/*					*/
 
-	movq	LG_CPU_DATA_errcode(%r11), %r12
+	movq	LG_CPU_errcode(%r11), %r12
 	/* The page exists for the guest */
 
 	/* Even if we fault, the Host doesn't look at this bit */
 	orq	$1, %r12
-	movq	%r12, LG_CPU_DATA_errcode(%r11)
+	movq	%r12, LG_CPU_errcode(%r11)
 
 #if DEBUG_PF_LEVEL > 1
 	PRINT_STR_6('E','o','r','r','o',':')
@@ -748,7 +753,7 @@ fault_back_to_host:
 #endif
 
 	movq	%r9, 8(%rax)
-	movq	LG_CPU_DATA_errcode(%r11), %r9
+	movq	LG_CPU_errcode(%r11), %r9
 	movq	%r9, 0(%rax)
 
 #if DEBUG_PF_LEVEL > 0
@@ -842,7 +847,7 @@ do_gfp:
 	orq	$LG_CPU_IRQFAULT_FL, LG_CPU_DATA_flags(%r11)
 
 	/* If there's an error code, then just jump to host */
-	movq	LG_CPU_DATA_errcode(%r11), %rax
+	movq	LG_CPU_errcode(%r11), %rax
 	testq	%rax, %rax
 	/* If not zero, than go back to host */
 	jnz	fault_back_to_host
@@ -1066,7 +1071,7 @@ decode_idt_and_jmp:
 	/* We told gcc we'd clobber rdi and rax... */
 	/* rdi here also holds the vcpu struct (host version) */
 	get_host_vcpu_data %rdi %rdi
-	movq	LG_CPU_DATA_trapnum(%rdi), %rdi
+	movq	LG_CPU_trapnum(%rdi), %rdi
 	shl	$1, %rdi
 	leaq	(%rax,%rdi,8), %rdi
 	DECODE_IDT %rdi %di %rax
@@ -1113,7 +1118,7 @@ lguest_syscall_trampoline:
 
 #if 0
 	/* Debugging save regs so we can print */
-	addq $LG_CPU_DATA_trapnum, %rsp
+	addq $LG_CPU_trapnum, %rsp
 	SAVE_REGS
 	movq	%rax, %r11
 	
@@ -1135,7 +1140,7 @@ lguest_syscall_trampoline:
 	RESTORE_REGS
 	/* skip fs */
 	addq	$8, %rsp
-	subq	$LG_CPU_DATA_trapnum, %rsp	/* skip %fs */
+	subq	$LG_CPU_trapnum, %rsp	/* skip %fs */
 #endif
 
 	/* Lets give ourselves some playing area */
@@ -1588,7 +1593,7 @@ double_fault_safe:
 	lgdt    LG_CPU_host_gdt(%rdi);				\
 	PRINT_L('J');
 	/* Set guest's TSS to available (clear byte 5 bit 2). */	\
-	movq    LG_CPU_vcpu(%rdi), %rax;				\
+	movq    LG_CPU_cpu(%rdi), %rax;				\
 	andb	$0xFD, (LG_CPU_gdt_table+GDT_ENTRY_TSS*8+5)(%rax);	\
 	PRINT_L('K');
 	movl  	$MSR_GS_BASE,%ecx;				\

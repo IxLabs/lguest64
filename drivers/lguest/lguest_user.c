@@ -16,6 +16,23 @@
 #include <linux/export.h>
 #include "lg.h"
 
+
+#ifdef CONFIG_SMP
+struct lg_cpu *lguest_get_cpu(struct lguest *lg,
+				    unsigned long __user *arg)
+{
+	unsigned long vcpu_num;
+
+	if (get_user(vcpu_num, arg))
+		return NULL;
+
+	if (vcpu_num >= atomic_read(&lg->nr_cpus))
+		return NULL;
+
+	return &lg->cpus[vcpu_num];
+}
+#endif
+
 /*L:056
  * Before we move on, let's jump ahead and look at what the kernel does when
  * it needs to look up the eventfds.  That will complete our picture of how we

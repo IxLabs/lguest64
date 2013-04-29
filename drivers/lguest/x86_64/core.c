@@ -387,6 +387,18 @@ out:
 	return 1;
 }
 
+//FIXME
+//Pe 32b exista un lguest_arch_handle_trap care analiza trap-urile.
+//Am pus semnatura aici in cazul in care vom dori sa o implementam.
+//Apelul se face din core.c
+void lguest_arch_handle_trap(struct lg_cpu *cpu){
+    //TODO
+}
+
+void lguest_arch_setup_regs(struct lg_cpu *cpu, unsigned long start){
+    //TODO
+}
+
 /*
  * _lguest_syscall_jumps - the per cpu array of text to jump to
  *    the specified syscall handlers.
@@ -637,7 +649,11 @@ static int map_pte_fn(pte_t *pte, struct page *pmd_page,
 	unsigned long *pages = (unsigned long *)data;
 
 	printk("loading %lx at %p for addr %lx\n", *pages, pte, addr);
-	set_pte_at(&init_mm, addr, pte, __pte(*pages));
+
+//FIXME Care e problema cu init_mm?
+//Unde e definita struct mm_struct init_mm???
+//Asta apare de 5 ori in acest fisier
+//	set_pte_at(&init_mm, addr, pte, __pte(*pages));
 	*pages += PAGE_SIZE;
 
 	return 0;
@@ -662,7 +678,7 @@ static int map_mod_pte_fn(pte_t *pte, struct page *pmd_page,
 	pages = lguest_get_actual_phys((void*)*virt_pages, NULL);
 	printk("mod loading %lx at %p for addr %lx\n", pages | prot, pte, addr);
 	
-	set_pte_at(&init_mm, addr, pte, __pte(pages | prot));
+//	set_pte_at(&init_mm, addr, pte, __pte(pages | prot));
 	*virt_pages += PAGE_SIZE;
 
 	return 0;
@@ -797,9 +813,9 @@ int lguest_arch_host_init(void)
 	 * We still need to add the protection we want though.
 	 */
 	pages = (unsigned long)&start_hyper_text | __PAGE_KERNEL_EXEC;
-	ret = apply_to_page_range(&init_mm, hvaddr,
-				  PAGE_SIZE * lguest_hv_pages,
-				  map_mod_pte_fn, &pages);
+//	ret = apply_to_page_range(&init_mm, hvaddr,
+//				  PAGE_SIZE * lguest_hv_pages,
+//				  map_mod_pte_fn, &pages);
 	if (ret < 0)
 		goto out;
 
@@ -847,8 +863,8 @@ int lguest_arch_host_init(void)
 	 * the scratch pad of the vcpu struct will be NULL.
 	 */
 	pages = (page_to_pfn(ZERO_PAGE(0)) << PAGE_SHIFT) | __PAGE_KERNEL_RO;
-	ret = apply_to_page_range(&init_mm, lg_cpu_addr,
-				  PAGE_SIZE, map_pte_fn, &pages);
+//	ret = apply_to_page_range(&init_mm, lg_cpu_addr,
+//				  PAGE_SIZE, map_pte_fn, &pages);
 	if (ret < 0)
 		goto out;
 
@@ -873,14 +889,16 @@ int lguest_arch_host_init(void)
 	 */
 	lguest_nmi_playground = __get_free_pages(lg_cpu_data_pages, GFP_KERNEL);
 	pages = lguest_nmi_playground | __PAGE_KERNEL;
-	ret = apply_to_page_range(&init_mm, lg_cpu_data_addr,
-				  lg_cpu_data_pages << PAGE_SHIFT,
-				  map_pte_fn, &pages);
+//	ret = apply_to_page_range(&init_mm, lg_cpu_data_addr,
+//				  lg_cpu_data_pages << PAGE_SHIFT,
+//				  map_pte_fn, &pages);
 	if (ret < 0)
 		goto out;
 	
 
-	lguest_io_init();
+    //FIXME - Functia exista in io.c, dar mi se pare ca acolo
+    //e prea mult DMA si se poate sa renunt la fisier
+	//lguest_io_init();
 	INIT_LIST_HEAD(&lguests);
 
         /* Setup LGUEST segments on all cpus */

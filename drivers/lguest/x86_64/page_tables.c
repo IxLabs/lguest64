@@ -924,11 +924,11 @@ static int page_in(struct lg_cpu *cpu, u64 vaddr, int flags)
 	unsigned idx;
 
 	lgdebug_lprint(LGD_PG_FL, "\nvaddr=%llx pgd=%p rip=%llx\n",
-		       vaddr, cpu->pgd, cpu->regs.rip);
+		       vaddr, cpu->pgd, cpu->regs->rip);
 	/* If vaddr is a HV page, then kill the guest */
 	if (contains_hv_page(vaddr, 1)) {
 		printk("hv start: %lx  end: %lx rip=%llx\n",
-		       lguest_hv_start, lguest_hv_start + lguest_hv_size, cpu->regs.rip);
+		       lguest_hv_start, lguest_hv_start + lguest_hv_size, cpu->regs->rip);
 		printk("vaddr=%llx  flags=%d (%s)\n",
 		       vaddr, flags, flags & _PAGE_DIRTY ? "write":"read");
 		if (0) /* don't kill it, just send a fault */
@@ -1160,19 +1160,19 @@ out:
 	 * If this is a fault to the kernel, test to see if we
 	 * are not in an infinite loop of faulting!
 	 */
-	if (ret || (cpu->regs.cs & 3) == 3)
+	if (ret || (cpu->regs->cs & 3) == 3)
 		/* All is ok, we handled it or it's user space */
 		cpu->lg_cpu_data->last_pgd = NULL;
 	else {
 		if ((cpu->lg_cpu_data->last_pgd == cpu->pgd) &&
-		    (cpu->lg_cpu_data->last_rip == cpu->regs.rip) &&
+		    (cpu->lg_cpu_data->last_rip == cpu->regs->rip) &&
 		    (cpu->lg_cpu_data->last_vaddr == vaddr))
 			/* FIXME: send double fault to guest instead */
 			kill_guest_dump(cpu, "double fault at %llx RIP: %llx",
 					vaddr, cpu->lg_cpu_data->last_rip);
 		else {
 			cpu->lg_cpu_data->last_pgd = cpu->pgd;
-			cpu->lg_cpu_data->last_rip = cpu->regs.rip;
+			cpu->lg_cpu_data->last_rip = cpu->regs->rip;
 			cpu->lg_cpu_data->last_vaddr = vaddr;
 		}
 	}
@@ -2396,13 +2396,36 @@ void lguest_remove_vm_shrinker(void)
 {
 }
 
-int init_guest_pagetable(struct lguest *lg, u64 pgtable)
+//FIXME
+//Cred ca asta era chiar functia de mai jos, dar nu sunt sigur!
+/*H:510
+ * At boot or module load time, init_pagetables() allocates and populates
+ * the Switcher PTE page for each CPU.
+ */
+__init int init_pagetables(struct page **switcher_page, unsigned int pages)
 {
-	lg->cr3 = pgtable;
+    //TODO
+	return 0;
+}
+/*:*/
+
+//FIXME
+int init_guest_pagetable(struct lguest *lg/*, u64 pgtable*/)
+{
+//	lg->cr3 = pgtable;
 
 	mutex_lock(&lguest_vm_lock);
 	list_add(&lg->vm_list, &lguest_infos);
 	mutex_unlock(&lguest_vm_lock);
 
 	return 0;
+}
+
+void free_pagetables(void)
+{
+}
+
+
+void free_guest_pagetable(struct lguest *lg)
+{
 }
