@@ -230,7 +230,7 @@ static int do_hcall(struct lg_cpu *cpu, struct lguest_regs *regs)
 		guest_new_pagetable(cpu, (u64)regs->rdx);
 		break;
 
-	case LHCALL_CRASH: {
+	case LHCALL_SHUTDOWN: {
 		char msg[128];
 		lgread(lg, msg, regs->rdx, sizeof(msg));
 		msg[sizeof(msg)-1] = '\0';

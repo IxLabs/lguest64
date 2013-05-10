@@ -319,7 +319,7 @@ static void lguest_load_idt(const struct desc_ptr *desc)
 
 static int lguest_panic(struct notifier_block *nb, unsigned long l, void *p)
 {
-	hcall(LHCALL_CRASH, __pa(p), 0, 0, 0);
+	hcall(LHCALL_SHUTDOWN, __pa(p), 0, 0, 0);
 	return NOTIFY_DONE;
 }
 
@@ -579,7 +579,7 @@ static void lguest_set_ldt(const void *addr, unsigned entries)
 {
 	/* FIXME: Implement. */
 	if (entries)
-		hcall(LHCALL_CRASH, __pa("set_ldt not supported"), 0, 0, 0);
+		hcall(LHCALL_SHUTDOWN, __pa("set_ldt not supported"), 0, 0, 0);
 }
 
 static void lguest_load_tls(struct thread_struct *t, unsigned int cpu)
@@ -811,7 +811,7 @@ static void lguest_write_ldt_entry(struct desc_struct *dt,
 				   int entrynum, u32 low, u32 high)
 {
 	/* FIXME: Allow this. */
-	hcall(LHCALL_CRASH, __pa("write_ldt not supported"), 0, 0, 0);
+	hcall(LHCALL_SHUTDOWN, __pa("write_ldt not supported"), 0, 0, 0);
 }
 
 static void lguest_write_gdt_entry(void *ptr, void *entry,
@@ -876,7 +876,7 @@ static unsigned long lguest_get_wallclock(void)
 
 static void lguest_power_off(void)
 {
-	hcall(LHCALL_CRASH, __pa("Power down"), 0, 0, 0);
+	hcall(LHCALL_SHUTDOWN, __pa("Power down"), 0, 0, 0);
 }
 
 //FIXME - deoarece syscall_init nu exista in paravirt_ops

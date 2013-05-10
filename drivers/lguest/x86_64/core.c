@@ -729,12 +729,6 @@ int lguest_arch_host_init(void)
 	if (ret < 0)
 		return -EPERM;
 
-	ret = lguest_device_init();
-	if (ret < 0) {
-		return ret;
-	}
-
-
 	/*
 	 * The hypervisor pages are mapped in the HV VM area.
 	 * The hypervisor text is mapped in the same location as the
@@ -799,6 +793,10 @@ int lguest_arch_host_init(void)
 	if (hvaddr == -ENOMEM)
 		goto out;
 
+    //Stefan
+    //FIXME - For the moment I stop here because it crashes
+    //First fix lguest_alloc_vm and then move on
+    return 0;
 	/* Mark the range that we don't want the guest to touch */
 	lguest_hv_start = hvaddr;
 	lguest_hv_size = (2<<20);
@@ -816,8 +814,8 @@ int lguest_arch_host_init(void)
 //	ret = apply_to_page_range(&init_mm, hvaddr,
 //				  PAGE_SIZE * lguest_hv_pages,
 //				  map_mod_pte_fn, &pages);
-	if (ret < 0)
-		goto out;
+//	if (ret < 0)
+//		goto out;
 
 	/*
 	 * Make sure that it really did map.
@@ -865,8 +863,8 @@ int lguest_arch_host_init(void)
 	pages = (page_to_pfn(ZERO_PAGE(0)) << PAGE_SHIFT) | __PAGE_KERNEL_RO;
 //	ret = apply_to_page_range(&init_mm, lg_cpu_addr,
 //				  PAGE_SIZE, map_pte_fn, &pages);
-	if (ret < 0)
-		goto out;
+//	if (ret < 0)
+//		goto out;
 
 	lg_cpu_data_addr = lg_cpu_addr + (PAGE_SIZE * lg_cpu_pages);
 	printk("hv vcpu guest data =\t%lx\n", lg_cpu_data_addr);
@@ -892,8 +890,8 @@ int lguest_arch_host_init(void)
 //	ret = apply_to_page_range(&init_mm, lg_cpu_data_addr,
 //				  lg_cpu_data_pages << PAGE_SHIFT,
 //				  map_pte_fn, &pages);
-	if (ret < 0)
-		goto out;
+//	if (ret < 0)
+//		goto out;
 	
 
     //FIXME - Functia exista in io.c, dar mi se pare ca acolo
