@@ -694,7 +694,7 @@ static unsigned long __init lguest_alloc_vm(void)
 	 * 4 megs of VM space (heck we have at least 48 bits of VM
 	 * area, I'm sure no one will miss 4 megs).
 	 */
-	lguest_vm_area = vmalloc(4<<20);
+	lguest_vm_area = alloc_vm_area(4<<20, NULL);
 	if (!lguest_vm_area)
 		return -ENOMEM;
 
@@ -708,7 +708,7 @@ static unsigned long __init lguest_alloc_vm(void)
 void lguest_free_hv(void)
 {
 	if (lguest_vm_area)
-		vfree(lguest_vm_area);
+		free_vm_area(lguest_vm_area);
 	lguest_vm_area = NULL;
 }
 
@@ -793,10 +793,6 @@ int lguest_arch_host_init(void)
 	if (hvaddr == -ENOMEM)
 		goto out;
 
-    //Stefan
-    //FIXME - For the moment I stop here because it crashes
-    //First fix lguest_alloc_vm and then move on
-    return 0;
 	/* Mark the range that we don't want the guest to touch */
 	lguest_hv_start = hvaddr;
 	lguest_hv_size = (2<<20);
@@ -817,6 +813,10 @@ int lguest_arch_host_init(void)
 //	if (ret < 0)
 //		goto out;
 
+    //Stefan
+    //FIXME - For the moment I stop here because it crashes
+    //First fix lguest_alloc_vm and then move on
+    return 0;
 	/*
 	 * Make sure that it really did map.
 	 */
