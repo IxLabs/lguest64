@@ -650,12 +650,8 @@ static int map_pte_fn(pte_t *pte, struct page *pmd_page,
 
 	printk("loading %lx at %p for addr %lx\n", *pages, pte, addr);
 
-//FIXME Care e problema cu init_mm?
-//Unde e definita struct mm_struct init_mm???
-//Asta apare de 5 ori in acest fisier
-//	set_pte_at(&init_mm, addr, pte, __pte(*pages));
+	set_pte_at(&init_mm, addr, pte, __pte(*pages));
 	*pages += PAGE_SIZE;
-
 	return 0;
 }
 
@@ -678,7 +674,8 @@ static int map_mod_pte_fn(pte_t *pte, struct page *pmd_page,
 	pages = lguest_get_actual_phys((void*)*virt_pages, NULL);
 	printk("mod loading %lx at %p for addr %lx\n", pages | prot, pte, addr);
 	
-//	set_pte_at(&init_mm, addr, pte, __pte(pages | prot));
+    set_pte_at(&init_mm, addr, pte, __pte(pages | prot));
+
 	*virt_pages += PAGE_SIZE;
 
 	return 0;
@@ -800,6 +797,7 @@ int lguest_arch_host_init(void)
 	/* Save the address for later use */
 	lguest_hv_addr = hvaddr;
 
+    printk("*****__BEFORE_APPLY_TO_PAGE_RANGE___****\n");
 	/*
 	 * Now map the Text portion to the memory. Since the text portion
 	 * may be loaded via a module, we can't use a simple __pa.
@@ -807,11 +805,11 @@ int lguest_arch_host_init(void)
 	 * We still need to add the protection we want though.
 	 */
 	pages = (unsigned long)&start_hyper_text | __PAGE_KERNEL_EXEC;
-//	ret = apply_to_page_range(&init_mm, hvaddr,
-//				  PAGE_SIZE * lguest_hv_pages,
-//				  map_mod_pte_fn, &pages);
-//	if (ret < 0)
-//		goto out;
+	ret = apply_to_page_range(&init_mm, hvaddr,
+				  PAGE_SIZE * lguest_hv_pages,
+				  map_mod_pte_fn, &pages);
+	if (ret < 0)
+		goto out;
 
     //Stefan
     //FIXME - For the moment I stop here because it crashes
@@ -861,10 +859,10 @@ int lguest_arch_host_init(void)
 	 * the scratch pad of the vcpu struct will be NULL.
 	 */
 	pages = (page_to_pfn(ZERO_PAGE(0)) << PAGE_SHIFT) | __PAGE_KERNEL_RO;
-//	ret = apply_to_page_range(&init_mm, lg_cpu_addr,
-//				  PAGE_SIZE, map_pte_fn, &pages);
-//	if (ret < 0)
-//		goto out;
+	ret = apply_to_page_range(&init_mm, lg_cpu_addr,
+				  PAGE_SIZE, map_pte_fn, &pages);
+	if (ret < 0)
+		goto out;
 
 	lg_cpu_data_addr = lg_cpu_addr + (PAGE_SIZE * lg_cpu_pages);
 	printk("hv vcpu guest data =\t%lx\n", lg_cpu_data_addr);
@@ -887,11 +885,11 @@ int lguest_arch_host_init(void)
 	 */
 	lguest_nmi_playground = __get_free_pages(lg_cpu_data_pages, GFP_KERNEL);
 	pages = lguest_nmi_playground | __PAGE_KERNEL;
-//	ret = apply_to_page_range(&init_mm, lg_cpu_data_addr,
-//				  lg_cpu_data_pages << PAGE_SHIFT,
-//				  map_pte_fn, &pages);
-//	if (ret < 0)
-//		goto out;
+	ret = apply_to_page_range(&init_mm, lg_cpu_data_addr,
+				  lg_cpu_data_pages << PAGE_SHIFT,
+				  map_pte_fn, &pages);
+	if (ret < 0)
+		goto out;
 	
 
     //FIXME - Functia exista in io.c, dar mi se pare ca acolo
