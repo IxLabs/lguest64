@@ -11,7 +11,7 @@ lguest_stat.o
 HYPE_ADDR := (0xFFC00000+4096)
 # The data is only 1k (256 interrupt handler pointers)
 HYPE_DATA_SIZE := 1024
-CFLAGS += -DHYPE_ADDR="$(HYPE_ADDR)" -DHYPE_DATA_SIZE="$(HYPE_DATA_SIZE)"
+ccflags-y += -DHYPE_ADDR="$(HYPE_ADDR)" -DHYPE_DATA_SIZE="$(HYPE_DATA_SIZE)"
 
 ##$(obj)/core.o: $(obj)/hypervisor-blob.c
 ### This links the hypervisor in the right place and turns it into a C array.

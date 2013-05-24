@@ -72,6 +72,7 @@ static unsigned long lguest_nmi_playground;
 
 
 
+
 /* FIXME: This is bogus, compute it on-demand */
 struct list_head lguests;
 
@@ -709,7 +710,7 @@ void lguest_free_hv(void)
 	lguest_vm_area = NULL;
 }
 
-int lguest_arch_host_init(void)
+int init(void)
 {
 	unsigned long pages;
 	unsigned long hvaddr;
@@ -725,6 +726,11 @@ int lguest_arch_host_init(void)
 	ret = paravirt_enabled();
 	if (ret < 0)
 		return -EPERM;
+
+    ret = lguest_device_init();
+    if(ret < 0){
+        return ret;
+    }
 
 	/*
 	 * The hypervisor pages are mapped in the HV VM area.
@@ -788,7 +794,7 @@ int lguest_arch_host_init(void)
 	hvaddr = lguest_alloc_vm();
 	printk("hv text =\t\t%lx\n",hvaddr);
 	if (hvaddr == -ENOMEM)
-		goto out;
+		goto device_remove;
 
 	/* Mark the range that we don't want the guest to touch */
 	lguest_hv_start = hvaddr;
@@ -797,7 +803,6 @@ int lguest_arch_host_init(void)
 	/* Save the address for later use */
 	lguest_hv_addr = hvaddr;
 
-    printk("*****__BEFORE_APPLY_TO_PAGE_RANGE___****\n");
 	/*
 	 * Now map the Text portion to the memory. Since the text portion
 	 * may be loaded via a module, we can't use a simple __pa.
@@ -805,22 +810,20 @@ int lguest_arch_host_init(void)
 	 * We still need to add the protection we want though.
 	 */
 	pages = (unsigned long)&start_hyper_text | __PAGE_KERNEL_EXEC;
+
 	ret = apply_to_page_range(&init_mm, hvaddr,
 				  PAGE_SIZE * lguest_hv_pages,
 				  map_mod_pte_fn, &pages);
 	if (ret < 0)
 		goto out;
 
-    //Stefan
-    //FIXME - For the moment I stop here because it crashes
-    //First fix lguest_alloc_vm and then move on
-    return 0;
 	/*
 	 * Make sure that it really did map.
 	 */
 	{
 		long dummy;
 
+        printk("ret: (before) %d, dummy %lx, lguest_hv_addr %lx\n", ret, dummy, lguest_hv_addr);
 		asm volatile (
 			"	xorl %0,%0\n"
 			"1:	movq 0(%2),%1\n"
@@ -829,12 +832,17 @@ int lguest_arch_host_init(void)
 			"3:	movl $(-"__stringify(ENOMEM)"),%0\n"
 			"	jmp 2b\n"
 			".previous\n"
+#if 0
 			".section __ex_table,\"a\"\n"
 			"	.align 8\n"
 			"	.quad 1b,3b\n"
 			".previous"
+#endif
 			: "=r"(ret), "=r"(dummy)
 			: "r"(lguest_hv_addr));
+
+
+        printk("ret: (after) %d, dummy %lx, lguest_hv_addr %lx\n", ret, dummy, lguest_hv_addr);
 		if (ret) {
 			printk("Can't read HV text mappings\n");
 			goto out;
@@ -890,7 +898,6 @@ int lguest_arch_host_init(void)
 				  map_pte_fn, &pages);
 	if (ret < 0)
 		goto out;
-	
 
     //FIXME - Functia exista in io.c, dar mi se pare ca acolo
     //e prea mult DMA si se poate sa renunt la fisier
@@ -902,13 +909,15 @@ int lguest_arch_host_init(void)
                 struct desc_struct *gdt_table;
                 
                 //TODO - Stefan - find a replacement for cpu_gdt in linux 3.8.0
+                //!!! Actually, first find out what this function did !!!
                 //gdt_table = cpu_gdt(i);
                 gdt_table = NULL;
                 if (!gdt_table)
                         continue;
-                //TODO - inainte GDT_ENTRY_HV_CS era definit in /include/asm-x86_64/segment.h
-                //Acum ar trebuie sa gasesc ceva in /arch/x86/include/asm/segment.h or so
-                //Le-am definit eu aici provizoriu
+
+                //TODO - GDT_ENTRY_HV_CS was defined (in linux 2.6.XX) in /include/asm-x86_64/segment.h
+                //Now I have to find replacement in  /arch/x86/include/asm/segment.h or so
+                //!!! I have defined these constants here for the moment !!!
                 gdt_table[GDT_ENTRY_HV_CS] = gdt_table[gdt_index(__KERNEL_CS)];
                 gdt_table[GDT_ENTRY_HV_DS] = gdt_table[gdt_index(__KERNEL_DS)];
         }
@@ -937,8 +946,11 @@ int lguest_arch_host_init(void)
 
 	/* Now update the LSTAR register on all CPUS */
 	update_star(NULL);
-    //TODO Nu inteleg cum mergea asta pe 2.6 ca nici acolo
-    //functia nu primea patru parametri
+
+    //TODO I am not sure this call does the right thing because
+    //this function was called with four parameters
+    //
+    //On linux 2.6.XX it still had three params
 	//smp_call_function(update_star, NULL, 0, 1);
 	smp_call_function(update_star, NULL, 1);
 
@@ -948,17 +960,14 @@ out:
 	lguest_free_hv();
 	free_pages(lguest_nmi_playground, lg_cpu_data_pages);
 	lguest_nmi_playground = 0;
+device_remove:
 	lguest_device_remove();
 	return ret;
 }
 
-//TODO - nu sunt sigur ca asta ar fi arch_fini
-//inainte asta era fini in modulul RedHat
-void lguest_arch_host_fini(void)
+void fini(void)
 {
 	reset_star(NULL);
-    //Habar n-am ce primea functia asta inainte
-	//smp_call_function(reset_star, NULL, 0, 1);
 	smp_call_function(reset_star, NULL, 1);
 	lguest_free_hv();
 	free_pages(lguest_nmi_playground, lg_cpu_data_pages);
@@ -967,3 +976,7 @@ void lguest_arch_host_fini(void)
 	lguest_nmi_playground = 0;
 	lguest_remove_vm_shrinker();
 }
+
+module_init(init);
+module_exit(fini);
+MODULE_LICENSE("GPL");

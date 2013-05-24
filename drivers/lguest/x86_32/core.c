@@ -718,3 +718,90 @@ void lguest_arch_setup_regs(struct lg_cpu *cpu, unsigned long start)
 	/* There are a couple of GDT entries the Guest expects at boot. */
 	setup_guest_gdt(cpu);
 }
+
+/*H:000
+ * Welcome to the Host!
+ *
+ * By this point your brain has been tickled by the Guest code and numbed by
+ * the Launcher code; prepare for it to be stretched by the Host code.  This is
+ * the heart.  Let's begin at the initialization routine for the Host's lg
+ * module.
+ */
+static int __init init(void)
+{
+	int err;
+
+	/* Lguest can't run under Xen, VMI or itself.  It does Tricky Stuff. */
+	if (get_kernel_rpl() != 0) {
+		printk("lguest is afraid of being a guest\n");
+		return -EPERM;
+	}
+
+    printk("Before map switcher\n");
+	/* First we put the Switcher up in very high virtual memory. */
+	err = map_switcher();
+	if (err)
+		goto out;
+
+    printk("After map_switcher\n");
+    goto unmap;
+
+	/* Now we set up the pagetable implementation for the Guests. */
+	err = init_pagetables(switcher_page, SHARED_SWITCHER_PAGES);
+	if (err)
+		goto unmap;
+
+    printk("After init_pagetables\n");
+
+	/* We might need to reserve an interrupt vector. */
+	err = init_interrupts();
+	if (err)
+		goto free_pgtables;
+
+    printk("After init_interrupts\n");
+
+	/* /dev/lguest needs to be registered. */
+	err = lguest_device_init();
+	if (err)
+		goto free_interrupts;
+
+    printk("After device_init\n");
+
+	/* Finally we do some architecture-specific setup. */
+	err = lguest_arch_host_init();
+    if (err)
+        goto free_interrupts;
+
+	/* All good! */
+	return 0;
+
+free_interrupts:
+	free_interrupts();
+free_pgtables:
+	free_pagetables();
+unmap:
+	unmap_switcher();
+out:
+	return err;
+}
+
+/* Cleaning up is just the same code, backwards.  With a little French. */
+static void __exit fini(void)
+{
+	lguest_device_remove();
+	free_interrupts();
+	free_pagetables();
+	unmap_switcher();
+
+	lguest_arch_host_fini();
+}
+/*:*/
+
+/*
+ * The Host side of lguest can be a module.  This is a nice way for people to
+ * play with it.
+ */
+module_init(init);
+module_exit(fini);
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Rusty Russell <rusty@rustcorp.com.au>");

@@ -3,12 +3,12 @@ obj-$(CONFIG_LGUEST_GUEST) += lguest_device.o
 
 # Host requires the other files, which can be a module.
 obj-$(CONFIG_LGUEST)	+= lg.o
-lg-y = core.o lguest_user.o
 
+lg-y = lguest_user.o core.o
 
-lg-$(CONFIG_X86_32) += x86_32/switcher.o x86_32/core.o x86_32/hypercalls.o \
-                       x86_32/interrupts_and_traps.o x86_32/page_tables.o \
-                       x86_32/segments.o x86_32/lguest_user.o
+lg-$(CONFIG_X86_32) += x86_32/switcher.o x86_32/core.o x86_32/hypercalls.o			\
+					   x86_32/interrupts_and_traps.o x86_32/page_tables.o			\
+					   x86_32/segments.o x86_32/lguest_user.o
 
 lg-$(CONFIG_X86_64) += x86_64/switcher.o x86_64/core.o x86_64/hypercalls.o			\
                        x86_64/interrupts_and_traps.o x86_64/page_tables.o			\
