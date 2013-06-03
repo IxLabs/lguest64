@@ -577,14 +577,14 @@ extern long start_hyper_text;
 /* Called by all CPUS */
 static void update_star(void *unused)
 {
-	unsigned long rax, rdx;
+	unsigned long rax;
 	int cpu = smp_processor_id();
 
 	/* Make the syscalls use the HV segments */
-	rdmsr(MSR_STAR, rax, rdx);
-	rdx &= ~0xffff;
-	rdx |= __HV_CS;
-	wrmsr(MSR_STAR, rax, rdx);
+	rdmsrl(MSR_STAR, rax);
+	rax &= ~0xffff;
+	rax |= __HV_CS;
+	wrmsrl(MSR_STAR, rax);
 
 	/*
 	 * Each CPU will point to a unique code path,
@@ -599,9 +599,8 @@ static void update_star(void *unused)
 	 */
 
 	/* save the old LSTAR for when we remove this module */
-	rdmsr(MSR_LSTAR, rax, rdx);
-	__get_cpu_var(host_old_lstar) = (rdx << 32) |
-		(u64)(u32)rax;
+	rdmsrl(MSR_LSTAR, rax);
+	__get_cpu_var(host_old_lstar) = rax;
 
 	/*
 	 * since the guest jump is relative, we
@@ -610,15 +609,12 @@ static void update_star(void *unused)
 	 */
 	rax = lguest_get_syscall(cpu);
 	memcpy(per_cpu(guest_jmp_to_syscall, cpu), (void*)rax, LGUEST_SYSCALL_BYTES);
-	
-	rdx = rax >> 32;
-	rax = (u64)(u32)rax;
 
 	/* Now we need to make that code jump to the host syscall */
 	lguest_set_syscall_host(cpu);
 
 	/* OK, we now use our syscall handler */
-	wrmsr(MSR_LSTAR, rax, rdx);
+	wrmsrl(MSR_LSTAR, rax);
 
 	/* XXX TODO: handle hotplug CPUS */
 }
@@ -823,7 +819,6 @@ int init(void)
 	{
 		long dummy;
 
-        printk("ret: (before) %d, dummy %lx, lguest_hv_addr %lx\n", ret, dummy, lguest_hv_addr);
 		asm volatile (
 			"	xorl %0,%0\n"
 			"1:	movq 0(%2),%1\n"
@@ -840,7 +835,6 @@ int init(void)
 			: "r"(lguest_hv_addr));
 
 
-        printk("ret: (after) %d, dummy %lx, lguest_hv_addr %lx\n", ret, dummy, lguest_hv_addr);
 		if (ret) {
 			printk("Can't read HV text mappings\n");
 			goto out;
@@ -942,10 +936,8 @@ int init(void)
 	/* we need a ljmp *location, so we set a variable to use for that */
 	lguest_host_system_call = (unsigned long)&system_call_after_swapgs;
 
-#if 0
 	/* Now update the LSTAR register on all CPUS */
 	update_star(NULL);
-#endif
 
 	//TODO I am not sure this call does the right thing because
 	//this function was called with four parameters
