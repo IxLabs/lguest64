@@ -832,12 +832,10 @@ int init(void)
 			"3:	movl $(-"__stringify(ENOMEM)"),%0\n"
 			"	jmp 2b\n"
 			".previous\n"
-#if 0
 			".section __ex_table,\"a\"\n"
 			"	.align 8\n"
 			"	.quad 1b,3b\n"
 			".previous"
-#endif
 			: "=r"(ret), "=r"(dummy)
 			: "r"(lguest_hv_addr));
 
@@ -944,18 +942,20 @@ int init(void)
 	/* we need a ljmp *location, so we set a variable to use for that */
 	lguest_host_system_call = (unsigned long)&system_call_after_swapgs;
 
+#if 0
 	/* Now update the LSTAR register on all CPUS */
 	update_star(NULL);
+#endif
 
-    //TODO I am not sure this call does the right thing because
-    //this function was called with four parameters
-    //
-    //On linux 2.6.XX it still had three params
+	//TODO I am not sure this call does the right thing because
+	//this function was called with four parameters
+	//
+	//On linux 2.6.XX it still had three params
 	//smp_call_function(update_star, NULL, 0, 1);
 	smp_call_function(update_star, NULL, 1);
 
 	lguest_stat_init();
-return 0;
+	return 0;
 out:
 	lguest_free_hv();
 	free_pages(lguest_nmi_playground, lg_cpu_data_pages);
