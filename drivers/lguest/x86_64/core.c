@@ -388,12 +388,86 @@ out:
 	return 1;
 }
 
-//FIXME
-//Pe 32b exista un lguest_arch_handle_trap care analiza trap-urile.
-//Am pus semnatura aici in cazul in care vom dori sa o implementam.
-//Apelul se face din core.c
 void lguest_arch_handle_trap(struct lg_cpu *cpu){
-    //TODO
+    struct lguest_regs *regs = cpu->regs;
+    unsigned long cr2 = 0;
+    int ret;
+
+    switch (regs->trapnum) {
+    case 7:
+        /* We've intercepted a Device Not Available fault. */
+        /* If they don't want to know, just absorb it. */
+        if (!cpu->ts)
+            return;
+        if (reflect_trap(cpu, 7, 0))
+            return;
+        kill_guest(cpu->lg, "Unhandled FPU trap at %#llx",
+                   regs->rip);
+    case 13:
+        if (!regs->errcode) {
+            ret = emulate_insn(cpu);
+            if (ret < 0) {
+                printk("bad emulate\n");
+                lguest_dump_vcpu_regs(cpu);
+                return;
+            }
+            return;
+        }
+        kill_guest_dump(cpu, "took gfp errcode %lld\n", regs->errcode);
+        break;
+    case 14:
+        if (demand_page(cpu, cr2, regs->errcode & PF_WRITE))
+            return;
+
+        lgdebug_lprint(LGD_PF_FL, "pass faulting address %lx to guest ring %d\n",
+                       cr2, cpu->regs->cs & 3);
+
+        /* inform guest on the current state of cr2 */
+        cpu->lg_cpu_data->cr2 = cr2;
+
+        /*
+         *           * Make the u/s bit of the error code reflect the
+         *                       * mode that the fault was in.
+         *                                   */
+        if ((regs->cs & 3) == 3)
+            regs->errcode |= PF_USER;
+        else
+            regs->errcode &= ~PF_USER;
+
+        debug_page_paranoid(cpu);
+
+        /* update the error code to see if this was a user trap */
+        if (reflect_trap(cpu, 14, 1))
+            return;
+
+        kill_guest_dump(cpu, "unhandled page fault at %#lx"
+                        " (rip=%#llx, errcode=%#llx)",
+                        cr2, regs->rip, regs->errcode);
+        break;
+    case LGUEST_TRAP_ENTRY:
+        /* hypercall! */
+        return;
+
+    case 32 ... 255:
+        cond_resched();
+        break;
+#if 0
+    case 252 ... 255:
+        printk("Got in trap %llx\n",regs->trapnum);
+        reflect_trap(cpu, regs->trapnum, 0);
+        break;
+#endif 
+
+    case 0:
+    case 4 ... 6:
+        if (reflect_trap(cpu, regs->trapnum, 0))
+            return;
+
+    /* fall through */
+    default:
+        kill_guest_dump(cpu, "bad trapnum %lld in vcpu %d\n", regs->trapnum, cpu->id);
+        return;
+    }
 }
 
 void lguest_arch_setup_regs(struct lg_cpu *cpu, unsigned long start){
@@ -439,10 +513,16 @@ static void run_guest_once(struct lg_cpu *cpu)
 	unsigned long old_fsbase = 0;
 	unsigned long old_fs;
 	u64 start = 0, end;
-	struct lguest_regs *regs = &cpu->regs;
+	struct lguest_regs *regs = cpu->regs;
 	int cpuid = smp_processor_id();
 	int ret;
 
+    printk("Entering run_guest_once\n");
+    //Here we have a problem with regs
+    //regs is an uninitialized pointer so it's normal to get
+    //segmentation fault
+    //
+    //FIXME Solve regs problem
 	BUG_ON(!regs->cr3);
 	BUG_ON(!cpu->pgd);
 
@@ -533,21 +613,15 @@ static void run_guest_once(struct lg_cpu *cpu)
 
 void lguest_arch_run_guest(struct lg_cpu *cpu)
 {
-    struct lguest_regs *regs = &cpu->regs;
+    struct lguest_regs *regs = cpu->regs;
     /* Even if *we* don't want FPU trap, guest might... */
     if (cpu->ts && user_has_fpu())
         stts();
 
-    //TODO - Not sure what to put here - Stefan
-
     run_guest_once(cpu);
-
-    //TODO - The oposite of what I should do
-    //before run_guest_once()
 
     if(cpu->ts && user_has_fpu())
         clts();
-
 
     /*
      * If the Guest page faulted, then the cr2 register will tell us the
@@ -821,7 +895,12 @@ int init(void)
 
 		asm volatile (
 			"	xorl %0,%0\n"
+			"1:\n"
+#if 0
+//This is a huge TODO - everytime I access %2
+//I get NULL pointer
 			"1:	movq 0(%2),%1\n"
+#endif
 			"2:\n"
 			".section .fixup,\"ax\"\n"
 			"3:	movl $(-"__stringify(ENOMEM)"),%0\n"
@@ -833,7 +912,6 @@ int init(void)
 			".previous"
 			: "=r"(ret), "=r"(dummy)
 			: "r"(lguest_hv_addr));
-
 
 		if (ret) {
 			printk("Can't read HV text mappings\n");
@@ -947,7 +1025,9 @@ int init(void)
 	smp_call_function(update_star, NULL, 1);
 
 	lguest_stat_init();
+
 	return 0;
+
 out:
 	lguest_free_hv();
 	free_pages(lguest_nmi_playground, lg_cpu_data_pages);
