@@ -34,7 +34,7 @@ static int break_guest_out(struct lg_cpu *cpu, const long __user *input)
 }
 
 
-struct lg_cpu *allocate_vcpu(struct lguest *lg)
+struct lg_cpu *allocate_vcpu(struct lguest *lg, int id)
 {
 	struct lg_cpu *cpu;
 	int ret;
@@ -44,9 +44,12 @@ struct lg_cpu *allocate_vcpu(struct lguest *lg)
 	 * It is RW while we are using the host cr3.
 	 * But we need to keep this separate than other pages.
 	 */
-	cpu = (void*)__get_free_pages(GFP_KERNEL, lg_cpu_order);
-	if (!cpu)
-		return NULL;
+	cpu = &lg->cpus[id];
+
+    //FIXME
+	//cpu = (void*)__get_free_pages(GFP_KERNEL, lg_cpu_order);
+	//if (!cpu)
+	//	return NULL;
 	memset(cpu, 0, (1<<(lg_cpu_order+PAGE_SHIFT)));
 
 	/* Set a pointer to where the vcpu struct is when we use the guest cr3 */
@@ -89,8 +92,8 @@ void free_cpu(struct lguest *lg, struct lg_cpu *cpu)
 	lguest_free_vcpu_mappings(cpu);
 }
 
-int cpu_start(struct lguest *lg, int id,
-				unsigned long entry_point,
+static int lg_cpu_start(struct lguest *lg, int id,
+				unsigned long start_ip,
 				void *pgd)
 {
 	struct lg_cpu *cpu;
@@ -111,16 +114,15 @@ int cpu_start(struct lguest *lg, int id,
 	if (id > NR_CPUS)
 		return -EINVAL;
 
-	cpu = allocate_vcpu(lg);
+	cpu = allocate_vcpu(lg, id);
 	if (!cpu)
 		return -ENOMEM;
-
-	memcpy(&lg->cpus[id], &cpu, sizeof(cpu));
 
 	cpu->id = id;
 	cpu->tsk = current;
 
-	printk("cpu: %p\n", cpu);
+	printk("[LG_CPU_START]: cpu: %p, cpu->tsk=%s\n", cpu, (cpu->tsk)?cpu->tsk->comm:"NULL");
+    printk("lg->cpus[id].tsk=%s\n", (lg->cpus[id].tsk)?lg->cpus[id].tsk->comm:"NULL");
 
 	/*
 	 * Have the VCPU point back to itself so we can easily
@@ -129,8 +131,7 @@ int cpu_start(struct lguest *lg, int id,
 	 */
 	cpu->cpu = cpu;
 
-	//TODO - Stefan - find a replacement for function in 3.8
-    //gdt_table = cpu_gdt(get_cpu());
+    gdt_table = get_cpu_gdt_table(get_cpu());
 	put_cpu();
 
 	/* Our gdt is basically host's, except for the privilege level */
@@ -235,24 +236,31 @@ int cpu_start(struct lguest *lg, int id,
 	cpu->tss.io_bitmap[0] = -1UL;
 	cpu->tss.io_bitmap[1] = -1UL;
 
-	regs = &cpu->regs;
-	memset(regs, 0, sizeof(*regs));
+    /*
+     * We need a complete page for the Guest registers: they are accessible
+     * to the Guest and we can only grant it access to whole pages.
+     */
+    cpu->regs_page = get_zeroed_page(GFP_KERNEL);
+    if(!cpu->regs_page)
+        return -ENOMEM;
+
+    /* We actually put the registers at the bottom of the page. */
+    cpu->regs = (void *)cpu->regs_page + PAGE_SIZE - sizeof(*cpu->regs);
+	regs = cpu->regs;
 	regs->cr3 = __pa(cpu->pgd->hcr3);
-	regs->rip = entry_point;
-	printk("starting at %lx\n", entry_point);
+	regs->rip = start_ip;
+	printk("starting at IP=%lx\n", start_ip);
 	regs->cs = __KERNEL_CS | GUEST_KERNEL_DPL;
 	regs->rflags = 0x202;   /* Interrupts enabled. */
 	regs->rsp = 0;
 	regs->ss = __KERNEL_DS | GUEST_KERNEL_DPL;
 
 	printk("gdt_table:\n");
-	for (i=1; i < 18; i++) {
-		if (!cpu->gdt_table[i].type)
-			continue;
-		printk("  %d: %lx dpl=%d\n",i,
-		       ((unsigned long*)cpu->gdt_table)[i],
-		       cpu->gdt_table[i].dpl);
-	}
+	for (i=1; i < 18; i++)
+		if (cpu->gdt_table[i].type)
+            printk("  %d: %lx dpl=%d\n",i,
+                   ((unsigned long*)cpu->gdt_table)[i],
+                   cpu->gdt_table[i].dpl);
 
 	init_waitqueue_head(&cpu->break_wq);
 
@@ -260,4 +268,69 @@ int cpu_start(struct lguest *lg, int id,
 out:
 	free_cpu(lg, cpu);
 	return -EINVAL;
+}
+
+int initialize(struct file *file, 
+                            const unsigned long __user *input)
+{
+    struct lguest *lg;
+    int err;
+    u64 args[4];
+    int i;
+
+    if (file->private_data)
+        return -EBUSY;
+
+    if (copy_from_user(args, input, sizeof(args)) != 0)
+        return -EFAULT;
+
+    lg = kzalloc(sizeof(*lg), GFP_KERNEL);
+    if (!lg)
+        return -ENOMEM;
+
+    list_add(&lg->list, &lguests);
+
+    /* FIXME: protect the guest_id counter */
+    /* guest ids start at 1 */
+    lg->guestid = ++next_guest_id;
+
+    lg->pfn_limit = args[0];
+    lg->page_offset = args[3];
+    lg->start_kernel_map = args[3];
+
+    mutex_init(&lg->page_lock);
+
+    INIT_LIST_HEAD(&lg->pgd_lru);
+    INIT_LIST_HEAD(&lg->pg_lru);
+
+    for (i=0; i < LGUEST_MAP_SIZE; i++) {
+        INIT_LIST_HEAD(&lg->g2h[i]);
+        INIT_LIST_HEAD(&lg->h2g[i]);
+    }
+    for (i=0; i < LGUEST_2MMAP_SIZE; i++)
+        INIT_LIST_HEAD(&lg->g2h2M[i]);
+
+    err = init_guest_pagetable(lg, args[1]);
+    if (err)
+        return -ENOMEM; /* what else to return ?? */
+#if 0
+
+    lg->state = setup_guest_state(i, lg->pgdirs[lg->pgdidx].pgdir,args[2]);
+    if (!lg->state) {
+        err = -ENOEXEC;
+        goto release_pgtable;
+    }
+#endif
+
+    atomic_set(&lg->nr_cpus , 0);
+    err = lg_cpu_start(lg, 0, args[2], __va(read_cr3()));
+    if (err < 0)
+        return err;
+
+    file->private_data = lg;
+
+    lguest_stat_add_guest(lg);
+
+    printk("Returnez %u\n", sizeof(args));
+    return sizeof(args);
 }

@@ -521,7 +521,7 @@ void guest_pagetable_clear_all(struct lg_cpu *cpu);
 void guest_pagetable_flush_user(struct lg_cpu *cpu);
 void guest_new_pagetable(struct lg_cpu *cpu, u64 cr3);
 
-int init_guest_pagetable(struct lguest *lg/*, u64 pgtable*/);
+int init_guest_pagetable(struct lguest *lg, u64 pgtable);
 void free_guest_pagetable(struct lguest *lg);
 int lguest_init_vcpu_pagetable(struct lg_cpu *cpu);
 int lguest_setup_guest_pages(struct lg_cpu *cpu);

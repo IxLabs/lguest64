@@ -618,6 +618,8 @@ void lguest_arch_run_guest(struct lg_cpu *cpu)
     if (cpu->ts && user_has_fpu())
         stts();
 
+    //FIXME - Stefan
+    return;
     run_guest_once(cpu);
 
     if(cpu->ts && user_has_fpu())

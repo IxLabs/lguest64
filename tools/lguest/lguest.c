@@ -1807,21 +1807,27 @@ static void __attribute__((noreturn)) run_guest(void)
 		readval = pread(lguest_fd, &notify_addr,
 				sizeof(notify_addr), cpu_id);
 
+        printf("After read: readval=%x, notify addr = %lx, fd=%d\n", readval, notify_addr, lguest_fd);
 		/* One unsigned long means the Guest did HCALL_NOTIFY */
 		if (readval == sizeof(notify_addr)) {
 			verbose("Notify on address %#lx\n", notify_addr);
+			printf("Notify on address %#lx\n", notify_addr);
 			handle_output(notify_addr);
 		/* ENOENT means the Guest died.  Reading tells us why. */
 		} else if (errno == ENOENT) {
 			char reason[1024] = { 0 };
+            printf("Eroare - ENOENT\n");
 			pread(lguest_fd, reason, sizeof(reason)-1, cpu_id);
 			errx(1, "%s", reason);
 		/* ERESTART means that we need to reboot the guest */
 		} else if (errno == ERESTART) {
+            printf("Eroare - restart\n");
 			restart_guest();
 		/* Anything else means a bug or incompatible change. */
-		} else
+		} else{
+            printf("Eroare - suntem pe ultimul caz\n");
 			err(1, "Running guest failed");
+        }
 	}
 }
 /*L:240

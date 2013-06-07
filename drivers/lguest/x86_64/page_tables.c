@@ -2409,10 +2409,9 @@ __init int init_pagetables(struct page **switcher_page, unsigned int pages)
 }
 /*:*/
 
-//FIXME
-int init_guest_pagetable(struct lguest *lg/*, u64 pgtable*/)
+int init_guest_pagetable(struct lguest *lg, u64 pgtable)
 {
-//	lg->cr3 = pgtable;
+	lg->cr3 = pgtable;
 
 	mutex_lock(&lguest_vm_lock);
 	list_add(&lg->vm_list, &lguest_infos);
