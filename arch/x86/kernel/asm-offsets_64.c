@@ -167,7 +167,7 @@ int main(void)
     ENTRY(rflags);
     BLANK();
     //FIXME
-    //Nu inteleg nimic din calculul asta
+    //Rsp nu se mai afla acolo. Am mutat regs.
     DEFINE(LG_CPU_save_rsp,
            ((sizeof(struct lguest_regs)+(PAGE_SIZE-1)) & ~(PAGE_SIZE-1)) +
            offsetof(struct lguest_regs, rsp));

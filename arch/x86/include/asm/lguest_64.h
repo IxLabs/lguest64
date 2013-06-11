@@ -65,8 +65,7 @@ struct lguest_text_ptr {
 	unsigned long end;
 };
 /* copied from old lguest code. Not sure if it's the best layout for us */
-struct lguest_regs
-{
+struct lguest_regs {
 	u64 cr3;			/*   0 ( 0x0) */
         /* Manually saved part. */
         u64 rbx, rcx, rdx;		/*   8 ( 0x8) */

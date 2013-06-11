@@ -88,7 +88,7 @@ out:
 void free_cpu(struct lguest *lg, struct lg_cpu *cpu)
 {
 	free_pages((unsigned long)cpu->lg_cpu_data, lg_cpu_data_order);
-	free_pages((unsigned long)cpu, lg_cpu_order);
+	//free_pages((unsigned long)cpu, lg_cpu_order);
 	lguest_free_vcpu_mappings(cpu);
 }
 
@@ -331,6 +331,5 @@ int initialize(struct file *file,
 
     lguest_stat_add_guest(lg);
 
-    printk("Returnez %u\n", sizeof(args));
     return sizeof(args);
 }

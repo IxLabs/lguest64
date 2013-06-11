@@ -348,6 +348,9 @@ switch_to_guest:
 	/* Now point the rdi to the vcpu data for the guest cr3 */
 	movq	%r12, %rdi
 
+    /* Save old pointer to hv_addr in r9 */
+    movq    %rdi, %r9
+
 	/* Set r11 to the guest RW data */
 	get_vcpu_data	%r11, %rdi
 	
@@ -372,10 +375,8 @@ switch_to_guest:
 	movq	%rbx, %cr4
 
 	/* put the guest's stack in */
-	movq	%r11, %rsp
-
-	/* move the stack to point to guest regs */
-	addq	$LG_CPU_regs, %rsp
+	/* stack points to guest's regs */
+	movq	LG_CPU_regs(%r9), %rsp
 
 	/* skip the cr3 (we already loaded it) */
 	addq	$8, %rsp

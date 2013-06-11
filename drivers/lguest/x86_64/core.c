@@ -517,12 +517,6 @@ static void run_guest_once(struct lg_cpu *cpu)
 	int cpuid = smp_processor_id();
 	int ret;
 
-    printk("Entering run_guest_once\n");
-    //Here we have a problem with regs
-    //regs is an uninitialized pointer so it's normal to get
-    //segmentation fault
-    //
-    //FIXME Solve regs problem
 	BUG_ON(!regs->cr3);
 	BUG_ON(!cpu->pgd);
 
@@ -579,6 +573,10 @@ static void run_guest_once(struct lg_cpu *cpu)
 	/* stats */
 	lguest_stat_start_time(cpu);
 
+    printk("***Comutarea efectiva pe guest***\n");
+    printk("Params:\n\%0 foo=%x\n\%1 bar=%x\n\%2 __KERNEL_DS=%x\n", foo, bar, __KERNEL_DS);
+    printk("\%3 __KERNEL_CS=%x\n\%4 cpu->cpu=%lx\n\%5 get_idt_table()=%x\n", __KERNEL_CS, cpu->cpu, get_idt_table());
+    printk("Functia apelata este \%6 = sw_guest (%lx)\n", sw_guest);
 	asm volatile ("pushq %2; pushq %%rsp; pushfq; pushq %3; call *%6;"
 		      /* The stack we pushed is off by 8, due to the previous pushq */
 		      "addq $8, %%rsp"
@@ -588,6 +586,7 @@ static void run_guest_once(struct lg_cpu *cpu)
 			"r" (sw_guest)
 		      : "memory", "cc");
 
+    printk("*** Gata - Am iesit din comutare ***\n");
 	/* stats */
 	lguest_stat_end_time(cpu);
 
@@ -600,8 +599,10 @@ static void run_guest_once(struct lg_cpu *cpu)
 	/*
 	 * Set the syscall to jump to host syscall.
 	 */
+    printk("La set syscall host\n");
 	lguest_set_syscall_host(cpuid);
 
+    printk("Inainte de ultimul if\n");
 	if (start && lguest_data_test_bit(TIME, cpu->lg_cpu_data)) {
 		end = sched_clock();
 		printk("to and from guest took %lld cycles!\n",
@@ -609,6 +610,7 @@ static void run_guest_once(struct lg_cpu *cpu)
 		lguest_data_clear_bit(TIME, cpu->lg_cpu_data);
 		start = 0;
 	}
+    printk("Get out of run_guest_once\n");
 }
 
 void lguest_arch_run_guest(struct lg_cpu *cpu)
@@ -618,8 +620,6 @@ void lguest_arch_run_guest(struct lg_cpu *cpu)
     if (cpu->ts && user_has_fpu())
         stts();
 
-    //FIXME - Stefan
-    return;
     run_guest_once(cpu);
 
     if(cpu->ts && user_has_fpu())
