@@ -1071,7 +1071,7 @@ decode_idt_and_jmp:
 	 * will return to run_guest_once.  This is a feature. */
 	/* We told gcc we'd clobber rdi and rax... */
 	/* rdi here also holds the vcpu struct (host version) */
-	get_host_vcpu_data %rdi %rdi
+	movq    LG_CPU_regs(%rdi), %rdi
 	movq	LG_CPU_trapnum(%rdi), %rdi
 	shl	$1, %rdi
 	leaq	(%rax,%rdi,8), %rdi
