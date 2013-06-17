@@ -99,7 +99,7 @@ static int lg_cpu_start(struct lguest *lg, int id,
 	struct lg_cpu *cpu;
 	struct desc_struct *gdt_table;
 	struct lguest_regs *regs;
-	struct desc_struct *tss;
+	struct ldttss_desc64 *tss;
 	struct lg_cpu_data *cpu_data;
 	struct lg_cpu *hv_vcpu;
 	u64 limit;
@@ -120,9 +120,6 @@ static int lg_cpu_start(struct lguest *lg, int id,
 
 	cpu->id = id;
 	cpu->tsk = current;
-
-	printk("[LG_CPU_START]: cpu: %p, cpu->tsk=%s\n", cpu, (cpu->tsk)?cpu->tsk->comm:"NULL");
-    printk("lg->cpus[id].tsk=%s\n", (lg->cpus[id].tsk)?lg->cpus[id].tsk->comm:"NULL");
 
 	/*
 	 * Have the VCPU point back to itself so we can easily
@@ -157,6 +154,7 @@ static int lg_cpu_start(struct lguest *lg, int id,
 		}
 	}
 
+    printk("IDT_ENTRIES=%d\nGDT_ENTRIES=%d\n", IDT_ENTRIES, GDT_ENTRIES);
 	for (i = 0; i < IDT_ENTRIES; i++) {
 		unsigned dpl = i == LGUEST_TRAP_ENTRY ? GUEST_KERNEL_DPL : 0;
 		/*
@@ -195,15 +193,14 @@ static int lg_cpu_start(struct lguest *lg, int id,
 	lguest_init_vcpu_pagetable(cpu);
 
 	/* setup the tss */
-	tss = &cpu->gdt_table[GDT_ENTRY_TSS];
+	tss = (struct ldttss_desc64 *)&cpu->gdt_table[GDT_ENTRY_TSS];
 	limit = sizeof(struct lguest_tss_struct);
 	base = (u64)&hv_vcpu->tss;
 	tss->limit0 = (u16)limit;
 	tss->base0 = (u16)base;
 	tss->base1 = (u8)(base>>16);
 	tss->base2 = (u8)(base>>24);
-	//TODO - base3 nu exista in desc_struct
-    //tss->base3 = (u32)(base>>32);
+    tss->base3 = (u32)(base>>32);
 	tss->type = 0x9;
 	tss->g = 0; /* small tss */
 

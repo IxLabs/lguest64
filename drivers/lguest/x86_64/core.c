@@ -574,9 +574,9 @@ static void run_guest_once(struct lg_cpu *cpu)
 	lguest_stat_start_time(cpu);
 
     printk("***Comutarea efectiva pe guest***\n");
-    printk("Params:\n\%0 foo=%x\n\%1 bar=%x\n\%2 __KERNEL_DS=%x\n", foo, bar, __KERNEL_DS);
-    printk("\%3 __KERNEL_CS=%x\n\%4 cpu->cpu=%lx\n\%5 get_idt_table()=%x\n", __KERNEL_CS, cpu->cpu, get_idt_table());
-    printk("Functia apelata este \%6 = sw_guest (%lx)\n", sw_guest);
+    printk("Params:\n0 foo=%lx\n1 bar=%lx\n2 __KERNEL_DS=%x\n", foo, bar, __KERNEL_DS);
+    printk("3 __KERNEL_CS=%x\n4 cpu->cpu=%p\n5 get_idt_table()=%p\n", __KERNEL_CS, cpu->cpu, get_idt_table());
+    printk("Functia apelata este sw_guest (%p)\n", sw_guest);
 	asm volatile ("pushq %2; pushq %%rsp; pushfq; pushq %3; call *%6;"
 		      /* The stack we pushed is off by 8, due to the previous pushq */
 		      "addq $8, %%rsp"
@@ -976,23 +976,20 @@ int init(void)
 	//lguest_io_init();
 	INIT_LIST_HEAD(&lguests);
 
-        /* Setup LGUEST segments on all cpus */
-        for_each_possible_cpu(i) {
-                struct desc_struct *gdt_table;
-                
-                //TODO - Stefan - find a replacement for cpu_gdt in linux 3.8.0
-                //!!! Actually, first find out what this function did !!!
-                //gdt_table = cpu_gdt(i);
-                gdt_table = NULL;
-                if (!gdt_table)
-                        continue;
+    /* Setup LGUEST segments on all cpus */
+    for_each_possible_cpu(i) {
+        struct desc_struct *gdt_table;
 
-                //TODO - GDT_ENTRY_HV_CS was defined (in linux 2.6.XX) in /include/asm-x86_64/segment.h
-                //Now I have to find replacement in  /arch/x86/include/asm/segment.h or so
-                //!!! I have defined these constants here for the moment !!!
-                gdt_table[GDT_ENTRY_HV_CS] = gdt_table[gdt_index(__KERNEL_CS)];
-                gdt_table[GDT_ENTRY_HV_DS] = gdt_table[gdt_index(__KERNEL_DS)];
-        }
+        gdt_table = get_cpu_gdt_table(i);
+        if (!gdt_table)
+            continue;
+
+        //TODO - GDT_ENTRY_HV_CS was defined (in linux 2.6.XX) in /include/asm-x86_64/segment.h
+        //Now I have to find replacement in  /arch/x86/include/asm/segment.h or so
+        //!!! I have defined these constants here for the moment !!!
+        gdt_table[GDT_ENTRY_HV_CS] = gdt_table[gdt_index(__KERNEL_CS)];
+        gdt_table[GDT_ENTRY_HV_DS] = gdt_table[gdt_index(__KERNEL_DS)];
+    }
 
 	/*
 	 * System call magic!!! To keep from updating the LSTAR reg
