@@ -17,10 +17,29 @@
 11:	add     $('a' - 10), %cl;               \
 12:	PRINT_OUT(%cl);
 
-#define PRINT_NUM_BX				\
+#define PRINT_NUM_BX			\
+    pushq   %rax;               \
+    pushq   %rcx;               \
+    pushq   %r10;               \
+    xorq    %rax, %rax;         \
+    mov     $0x10, %rcx;        \
+8:                              \
+    shl     $4, %rax;           \
+    mov     %rbx, %r10;         \
+    and     $0xf, %r10;         \
+    or      %r10, %rax;         \
+    shr     $4, %rbx;           \
+    loop    8b;                 \
+    mov     %rax, %rbx;         \
+    mov     $0x10, %r10;        \
 9:	PRINT_HEX(%bl);				\
 	shr     $4, %rbx;			\
-	jne     9b
+    sub     $0x01, %r10;        \
+    cmp     $0x0, %r10;         \
+    jne     9b;                 \
+    popq    %r10;               \
+    popq    %rcx;               \
+    popq    %rax;
 
 #define PRINT_NUM(n)				\
 	movl    $n, %ebx;			\
@@ -127,6 +146,12 @@
 
 #define	PRINT_STR_9(a,b,c,d,e,f,g,h,i)		\
 	PRINT_STR_5(a,b,c,d,e);PRINT_STR_4(f,g,h,i)
+
+#define	PRINT_STR_10(a,b,c,d,e,f,g,h,i,j)		\
+	PRINT_STR_5(a,b,c,d,e);PRINT_STR_5(f,g,h,i,j)
+
+#define	PRINT_STR_11(a,b,c,d,e,f,g,h,i,j,k)		\
+	PRINT_STR_6(a,b,c,d,e,f);PRINT_STR_5(g,h,i,j,k)
 
 #define PRINT_STR_STACK				\
 	PRINT_STR_6('S','t','a','c','k',':')
