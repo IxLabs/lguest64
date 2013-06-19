@@ -609,6 +609,9 @@ static void run_guest_once(struct lg_cpu *cpu)
 void lguest_arch_run_guest(struct lg_cpu *cpu)
 {
     struct lguest_regs *regs = cpu->regs;
+
+    cpu->host_gdt_ptr = (unsigned long) get_cpu_gdt_table(get_cpu());
+
     /* Even if *we* don't want FPU trap, guest might... */
     if (cpu->ts && user_has_fpu())
         stts();
