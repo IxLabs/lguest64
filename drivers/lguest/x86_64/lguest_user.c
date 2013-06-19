@@ -142,9 +142,9 @@ static int lg_cpu_start(struct lguest *lg, int id,
 		/* Keep TSS, and HV, and Host KERNEL segments the same */
 		case GDT_ENTRY_TSS:
 		/* The TSS will be modified below */
-		case GDT_ENTRY_HV_CS:
+		case GDT_ENTRY_LGUEST_HV_CS:
             break;
-		case GDT_ENTRY_HV_DS:
+		case GDT_ENTRY_LGUEST_HV_DS:
 			break;
 		default:
 			if (!cpu->gdt_table[i].dpl)
@@ -154,7 +154,6 @@ static int lg_cpu_start(struct lguest *lg, int id,
 		}
 	}
 
-    printk("IDT_ENTRIES=%d\nGDT_ENTRIES=%d\n", IDT_ENTRIES, GDT_ENTRIES);
 	for (i = 0; i < IDT_ENTRIES; i++) {
 		unsigned dpl = i == LGUEST_TRAP_ENTRY ? GUEST_KERNEL_DPL : 0;
 		/*
@@ -246,14 +245,14 @@ static int lg_cpu_start(struct lguest *lg, int id,
 	regs = cpu->regs;
 	regs->cr3 = __pa(cpu->pgd->hcr3);
 	regs->rip = start_ip;
-	printk("starting at IP=%lx\n", start_ip);
+	printk("starting at RIP=%lx\n", start_ip);
 	regs->cs = __KERNEL_CS | GUEST_KERNEL_DPL;
 	regs->rflags = 0x202;   /* Interrupts enabled. */
 	regs->rsp = 0;
 	regs->ss = __KERNEL_DS | GUEST_KERNEL_DPL;
 
 	printk("gdt_table:\n");
-	for (i=1; i < 18; i++)
+	for (i=1; i < GDT_ENTRIES; i++)
 		if (cpu->gdt_table[i].type)
             printk("  %d: %lx dpl=%d\n",i,
                    ((unsigned long*)cpu->gdt_table)[i],

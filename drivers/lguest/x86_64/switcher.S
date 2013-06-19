@@ -6,11 +6,6 @@
 #include "lg.h"
 #include "debug_switcher.h"
 
-//FIXME - definitii facute de mine dupa
-//cum erau in kernelul 2.6
-#define __HV_CS 0x80
-#define __HV_DS 0x88
-
 .text
 .align PAGE_SIZE
 ENTRY(start_switcher_text)
@@ -241,39 +236,36 @@ switch_to_guest:
 	/*
 	 * The NMI does weird things if we take an NMI after
 	 * loading the IDT and we are still in __KERNEL_CS.
-	 * So switch over to __HV_CS and __HV_DS.  But in
-	 * x86_64, there's really no good way to do that.
-	 * So we set up a interrupt stack frame and iret
-	 * here. But becareful, the iret goes back so we
-	 * need to test for switching after the label.
+	 * So switch over to __LGUEST_HV_CS and __LGUEST_HV_DS.
+     * But in x86_64, there's really no good way to do that.
+	 * So we set up a interrupt stack frame and iret here.
+     * But becareful, the iret goes back so we need to test
+     * for switching after the label.
 	 * We also need to test to see if we need to bother
 	 * at all in doing any of this.
 	 */
 
 	/* Are we already at the proper CS */
 	mov	%cs, %rax
-	cmp	$__HV_CS, %rax
-	je	3f
+	cmp	$__LGUEST_HV_CS, %rax
+	je	2f
 
 	/* Nope, so we set up a stack frame to change our CS and DS */
-	pushq	$__HV_DS
-	pushq	%rsp
+    mov     %rsp, %rax
+    pushq	$__LGUEST_HV_DS
+    pushq	%rax
 	pushfq
-	pushq	$__HV_CS
+    pushq	$__LGUEST_HV_CS
 	/* We don't know our RIP so make a call to put it on the stack */
 	call	1f
 1:
 	/* The iret will go back to the 1 label, so skip if we already
 	 * did the iret */
 	mov	%cs, %rax
-	cmp	$__HV_CS, %rax
+	cmp	$__LGUEST_HV_CS, %rax
 	je	2f
 	iretq
-
 2:
-	/* Adjust rsp for push of DS */
-	addq	$8, %rsp
-3:
 
 	/*
 	 * The NMI is a big PITA. There's no way to atomically load the
@@ -1371,11 +1363,11 @@ nmi_trampoline:
 #endif
 
 	/* we want to come back here on the iret */
-	pushq  $__HV_DS
+	pushq  $__LGUEST_HV_DS
 	/* put the vcpu guest data as our stack */
 	pushq %r11
 	pushfq
-	pushq	$__HV_CS
+	pushq	$__LGUEST_HV_CS
 
 	/*
 	 * We wont be able to use the stack on return,
@@ -1445,7 +1437,7 @@ nmi_trampoline:
 	movq	LGUEST_REGS_ss(%rsp), %r8
 	testq	%r8, %r8
 	jne	1f
-	movq	$__HV_DS, LGUEST_REGS_ss(%rsp)
+	movq	$__LGUEST_HV_DS, LGUEST_REGS_ss(%rsp)
 1:
 #endif
 
@@ -1583,7 +1575,7 @@ double_fault_safe:
 	PRINT_L('G');
 	PRINT_QUAD(%rdi);
 	/* Load lguest ds segment for convenience. */			\
-	movq	$(__HV_DS), %rax;					\
+	movq	$(__LGUEST_HV_DS), %rax;					\
 	movq	%rax, %ds;						\
 	PRINT_L('H');
 	/* Load the host page tables since that's where the gdt is */	\

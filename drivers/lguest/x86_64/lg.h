@@ -63,10 +63,6 @@ struct lg_eventfd_map {
     struct lg_eventfd map[];
 };
 
-#define GDT_ENTRY_HV_CS 16
-#define GDT_ENTRY_HV_DS 17
-
-//TODO - Am mutat-o din asm/lguest_64.h
 /*
  * The lg_cpu_data struct is put into the writable section
  * of the guest. It can write to it whenever it pleases, but that's
@@ -417,8 +413,6 @@ do {						\
 	}					\
 }  while(0)
 
-//TODO - Cateva lucruri care lipsesc din kernelul acesta si existau in 2.6
-#define __HV_CS 0x80
 #define GATE_ADDRESS(g) ((unsigned long)((unsigned long)g.offset_high << 32) \
                          | (g.offset_middle << 16) | g.offset_low)
 
@@ -431,7 +425,7 @@ static inline void _lguest_set_gate(struct gate_struct64 *s, unsigned type, unsi
 				    unsigned dpl, unsigned ist)
 {
         s->offset_low = PTR_LOW(func);
-        s->segment = __HV_CS;
+        s->segment = __LGUEST_HV_CS;
         s->ist = ist;
         s->p = 1;
         s->dpl = dpl;

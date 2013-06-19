@@ -573,10 +573,7 @@ static void run_guest_once(struct lg_cpu *cpu)
 	/* stats */
 	lguest_stat_start_time(cpu);
 
-    printk("***Comutarea efectiva pe guest***\n");
-    printk("Params:\n0 foo=%lx\n1 bar=%lx\n2 __KERNEL_DS=%x\n", foo, bar, __KERNEL_DS);
-    printk("3 __KERNEL_CS=%x\n4 cpu->cpu=%p\n5 get_idt_table()=%p\n", __KERNEL_CS, cpu->cpu, get_idt_table());
-    printk("Functia apelata este sw_guest (%p)\n", sw_guest);
+    printk("***Give control to guest***\n");
 	asm volatile ("pushq %2; pushq %%rsp; pushfq; pushq %3; call *%6;"
 		      /* The stack we pushed is off by 8, due to the previous pushq */
 		      "addq $8, %%rsp"
@@ -586,7 +583,7 @@ static void run_guest_once(struct lg_cpu *cpu)
 			"r" (sw_guest)
 		      : "memory", "cc");
 
-    printk("*** Gata - Am iesit din comutare ***\n");
+    printk("*** Back in host ***\n");
 	/* stats */
 	lguest_stat_end_time(cpu);
 
@@ -599,18 +596,14 @@ static void run_guest_once(struct lg_cpu *cpu)
 	/*
 	 * Set the syscall to jump to host syscall.
 	 */
-    printk("La set syscall host\n");
 	lguest_set_syscall_host(cpuid);
 
-    printk("Inainte de ultimul if\n");
 	if (start && lguest_data_test_bit(TIME, cpu->lg_cpu_data)) {
 		end = sched_clock();
-		printk("to and from guest took %lld cycles!\n",
-		       end - start);
+		printk("to and from guest took %lld cycles!\n", end - start);
 		lguest_data_clear_bit(TIME, cpu->lg_cpu_data);
 		start = 0;
 	}
-    printk("Get out of run_guest_once\n");
 }
 
 void lguest_arch_run_guest(struct lg_cpu *cpu)
@@ -659,7 +652,7 @@ static void update_star(void *unused)
 	/* Make the syscalls use the HV segments */
 	rdmsrl(MSR_STAR, rax);
 	rax &= ~0xffff;
-	rax |= __HV_CS;
+	rax |= __LGUEST_HV_CS;
 	wrmsrl(MSR_STAR, rax);
 
 	/*
@@ -984,11 +977,8 @@ int init(void)
         if (!gdt_table)
             continue;
 
-        //TODO - GDT_ENTRY_HV_CS was defined (in linux 2.6.XX) in /include/asm-x86_64/segment.h
-        //Now I have to find replacement in  /arch/x86/include/asm/segment.h or so
-        //!!! I have defined these constants here for the moment !!!
-        gdt_table[GDT_ENTRY_HV_CS] = gdt_table[gdt_index(__KERNEL_CS)];
-        gdt_table[GDT_ENTRY_HV_DS] = gdt_table[gdt_index(__KERNEL_DS)];
+        gdt_table[GDT_ENTRY_LGUEST_HV_CS] = gdt_table[gdt_index(__KERNEL_CS)];
+        gdt_table[GDT_ENTRY_LGUEST_HV_DS] = gdt_table[gdt_index(__KERNEL_DS)];
     }
 
 	/*
