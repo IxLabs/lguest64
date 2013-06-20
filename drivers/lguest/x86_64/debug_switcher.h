@@ -18,10 +18,10 @@
 12:	PRINT_OUT(%cl);
 
 #define PRINT_NUM_BX			\
-    pushq   %rax;               \
+/*    pushq   %rax;               \
     pushq   %rcx;               \
     pushq   %r10;               \
-    xorq    %rax, %rax;         \
+*/    xorq    %rax, %rax;         \
     mov     $0x10, %rcx;        \
 8:                              \
     shl     $4, %rax;           \
@@ -36,10 +36,10 @@
 	shr     $4, %rbx;			\
     sub     $0x01, %r10;        \
     cmp     $0x0, %r10;         \
-    jne     9b;                 \
+    jne     9b;   /*              \
     popq    %r10;               \
     popq    %rcx;               \
-    popq    %rax;
+    popq    %rax;*/
 
 #define PRINT_NUM(n)				\
 	movl    $n, %ebx;			\

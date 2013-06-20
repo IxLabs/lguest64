@@ -104,7 +104,7 @@ start_hyper_text:
 
 /* Get the guest data from VCPU data */
 .macro get_vcpu_data R V
-	movq (\V), \R
+	movq LG_CPU_cpu_data_hv(\V), \R
 .endm
 
 /* The host vcpu date is always right after the HV vcpu data */
@@ -208,7 +208,6 @@ start_hyper_text:
  */
 switch_to_guest:
 	SAVE_REGS
-	PRINT_OUT($65)
 	/* save host stack */
 	movq	%rsp, LG_CPU_host_stack(%rdi)
 

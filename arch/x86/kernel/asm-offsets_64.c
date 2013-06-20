@@ -103,6 +103,7 @@ int main(void)
     DEFINE(LG_CPU_trapnum, offsetof(struct lguest_regs, trapnum));
     /* Used for page faulting */
     DEFINE(LG_CPU_errcode, offsetof(struct lguest_regs, errcode));
+    ENTRY(cpu_data_hv);
     ENTRY(cpu_hv);
     ENTRY(cpu);
     ENTRY(regs);
