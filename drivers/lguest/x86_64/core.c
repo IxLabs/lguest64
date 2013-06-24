@@ -815,6 +815,12 @@ int init(void)
 	 *     |                  |
 	 *     |                  |
 	 *     |                  |
+	 *     |                  |
+	 *     |                  |
+	 *     +------------------+
+	 *     |    VCPU Regs     |
+	 *     |  (unique to CPU) |
+	 *     |                  |
 	 *     +------------------+
 	 *     |                  |
 	 *     | VCPU Scratch Pad |
