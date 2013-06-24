@@ -1723,7 +1723,7 @@ void guest_new_pagetable(struct lg_cpu *cpu, u64 cr3)
 
 	mutex_lock(&lg->page_lock);
 
-	lgdebug_lprint("assign new pgd vcpu=%p oldpgd=%p cr3=%llx\n",
+	lgdebug_lprint(LGD_PG_FL, "assign new pgd vcpu=%p oldpgd=%p cr3=%llx\n",
 		       cpu, cpu->pgd, cr3);
 
 	/* see if the cr3 already exists. */
@@ -1773,7 +1773,7 @@ void guest_new_pagetable(struct lg_cpu *cpu, u64 cr3)
 	cpu->pgd = pgd;
 	cpu->pgd->flags |= LGUEST_PGD_BUSY_FL;
 
-	lgdebug_lprint("new pgd=%p\n", pgd);
+	lgdebug_lprint(LGD_PG_FL, "new pgd=%p\n", pgd);
 
 out:
 	mutex_unlock(&lg->page_lock);
