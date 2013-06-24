@@ -13,7 +13,7 @@ lg-$(CONFIG_X86_32) += x86_32/switcher.o x86_32/core.o x86_32/hypercalls.o			\
 lg-$(CONFIG_X86_64) += x86_64/switcher.o x86_64/core.o x86_64/hypercalls.o			\
                        x86_64/interrupts_and_traps.o x86_64/page_tables.o			\
                        x86_64/segments.o x86_64/lguest_user.o x86_64/lguest_stat.o	\
-					   x86_64/lguest_debug.o
+					   x86_64/lguest_debug.o x86_64/io.o
 
 Preparation Preparation!: PREFIX=P
 Guest: PREFIX=G
@@ -36,4 +36,4 @@ Puppy:
 	@sleep 2; clear; printf "\n\n  Good puppy!\n\n"; sleep 1; clear
 
 .PHONY clean:
-	rm -f lg.ko *.o x86_*/*.o
+	rm -f lg.ko *.o x86_*/*.o Module.symvers modules.order lg.mod.c

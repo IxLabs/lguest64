@@ -46,10 +46,6 @@ struct lg_cpu *allocate_vcpu(struct lguest *lg, int id)
 	 */
 	cpu = &lg->cpus[id];
 
-    //FIXME
-	//cpu = (void*)__get_free_pages(GFP_KERNEL, lg_cpu_order);
-	//if (!cpu)
-	//	return NULL;
 	memset(cpu, 0, (1<<(lg_cpu_order+PAGE_SHIFT)));
 
 	/* Set a pointer to where the vcpu struct is when we use the guest cr3 */
@@ -72,6 +68,18 @@ struct lg_cpu *allocate_vcpu(struct lguest *lg, int id)
 	/* We also want a pointer to the RW data section when we use the guest cr3 */
 	cpu->cpu_data_hv = lg_cpu_data_addr;
 
+    /*
+     * We need a complete page for the Guest registers: they are accessible
+     * to the Guest and we can only grant it access to whole pages.
+     */
+	cpu->regs_page = (unsigned long)__get_free_pages(GFP_KERNEL, lg_cpu_regs_order);
+    if(!cpu->regs_page)
+        goto out;
+
+	memset((void*)cpu->regs_page, 0, (1<<(lg_cpu_regs_order+PAGE_SHIFT)));
+
+    cpu->cpu_regs_hv = lg_cpu_regs_addr + (PAGE_SIZE - sizeof(struct lguest_regs));
+
 	/* Now map all this where it belongs in the guest cr3 */
 	ret = lguest_map_guest_vcpu(cpu);
 	if (ret < 0)
@@ -80,6 +88,7 @@ struct lg_cpu *allocate_vcpu(struct lguest *lg, int id)
 	return cpu;
 
 out:
+	free_pages((unsigned long)cpu->regs_page, lg_cpu_regs_order);
 	free_pages((unsigned long)cpu->lg_cpu_data, lg_cpu_data_order);
 	free_pages((unsigned long)cpu, lg_cpu_order);
 	return NULL;
@@ -88,7 +97,6 @@ out:
 void free_cpu(struct lguest *lg, struct lg_cpu *cpu)
 {
 	free_pages((unsigned long)cpu->lg_cpu_data, lg_cpu_data_order);
-	//free_pages((unsigned long)cpu, lg_cpu_order);
 	lguest_free_vcpu_mappings(cpu);
 }
 
@@ -232,15 +240,9 @@ static int lg_cpu_start(struct lguest *lg, int id,
 	cpu->tss.io_bitmap[0] = -1UL;
 	cpu->tss.io_bitmap[1] = -1UL;
 
-    /*
-     * We need a complete page for the Guest registers: they are accessible
-     * to the Guest and we can only grant it access to whole pages.
+    /* We put the registers at the bottom of the regs_page
+     * bacause stack grows down
      */
-    cpu->regs_page = get_zeroed_page(GFP_KERNEL);
-    if(!cpu->regs_page)
-        return -ENOMEM;
-
-    /* We actually put the registers at the bottom of the page. */
     cpu->regs = (void *)cpu->regs_page + PAGE_SIZE - sizeof(*cpu->regs);
 	regs = cpu->regs;
 	regs->cr3 = __pa(cpu->pgd->hcr3);

@@ -508,7 +508,7 @@ void do_async_hcalls(struct lg_cpu *cpu)
 static void initialize(struct lg_cpu *cpu)
 {
 	struct lguest *lg = cpu->lg;
-	struct lguest_regs *regs = &cpu->regs;
+	struct lguest_regs *regs = cpu->regs;
 	int i;
 	u32 tsc_speed;
 
@@ -566,7 +566,7 @@ void do_hypercalls(struct lg_cpu *cpu)
 	do_async_hcalls(cpu);
 
     if(!cpu->pending_notify){
-	    do_hcall(cpu, &cpu->regs);
+	    do_hcall(cpu, cpu->regs);
         cpu->hcall = NULL;
     }
 }

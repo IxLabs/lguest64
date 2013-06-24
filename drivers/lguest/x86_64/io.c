@@ -65,6 +65,8 @@ void lguest_io_init(void)
 		INIT_LIST_HEAD(&dma_hash[i]);
 }
 
+#if 0
+
 /* FIXME: allow multi-page lengths. */
 static int check_dma_list(struct lguest *lg, const struct lguest_dma *dma)
 {
@@ -625,6 +627,8 @@ unlock:
 	return ret;
 }
 /*:*/
+
+#endif
 
 /*L:410 This really has completed the Launcher.  Not only have we now finished
  * the longest chapter in our journey, but this also means we are over halfway

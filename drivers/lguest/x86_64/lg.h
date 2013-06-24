@@ -182,6 +182,7 @@ struct lg_cpu {
 	/* Must be 16 bytes aligned at regs+sizeof(regs) */
 	unsigned long regs_page;
 	struct lguest_regs *regs;
+	unsigned long cpu_regs_hv;
 
 	struct lguest_pages *last_pages;
 
@@ -371,6 +372,9 @@ extern int lg_cpu_order;
 extern unsigned long lg_cpu_data_addr;
 extern int lg_cpu_data_pages;
 extern int lg_cpu_data_order;
+extern unsigned long lg_cpu_regs_addr;
+extern int lg_cpu_regs_pages;
+extern int lg_cpu_regs_order;
 extern unsigned long _lguest_default_idt_entries[];
 
 #if  0

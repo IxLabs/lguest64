@@ -327,6 +327,13 @@ switch_to_guest:
 	/* Load the pointer to the vcpu data when in the guest cr3 to r12 */
 	movq	LG_CPU_cpu_hv(%rdi), %r12;
 
+	/* Set r11 to the guest RW data */
+	get_vcpu_data	%r11, %rdi
+
+    /* Set new stack position */
+    /* Stack points to guest's regs */
+    mov     LG_CPU_cpu_regs_hv(%rdi), %r9
+
 	/* switch to the guests page tables */
 	movq	LG_CPU_guest_cr3(%rdi), %rax
 	movq	%rax, %cr3
@@ -336,15 +343,9 @@ switch_to_guest:
 	 * Now the NMI should be safe since it is using the correct
 	 * stack.
 	 */
-	/* Now point the rdi to the vcpu data for the guest cr3 */
-	movq	%r12, %rdi
+    /* Now point the rdi to the vcpu data for the guest cr3 */
+    movq        %r12, %rdi
 
-    /* Save old pointer to hv_addr in r9 */
-    movq    %rdi, %r9
-
-	/* Set r11 to the guest RW data */
-	get_vcpu_data	%r11, %rdi
-	
 	/* Load the guest gs pointer */
 	movl	$MSR_KERNEL_GS_BASE, %ecx
 	movq	LG_CPU_DATA_guest_gs_a(%r11), %rax
@@ -366,8 +367,7 @@ switch_to_guest:
 	movq	%rbx, %cr4
 
 	/* put the guest's stack in */
-	/* stack points to guest's regs */
-	movq	LG_CPU_regs(%r9), %rsp
+	movq	%r9, %rsp
 
 	/* skip the cr3 (we already loaded it) */
 	addq	$8, %rsp
@@ -426,8 +426,6 @@ return_to_host:
 	SWITCH_TO_HOST
 	iretq
 
-#define PTE_MASK ~((0x3fff<<52)|0xfff)
-
 #define DEBUG_PF_LEVEL 0
 
 /*
@@ -472,7 +470,8 @@ fault_back_to_host:
 
 	/* we faulted already, must switch to host */
 	/* but first put back the stack. */
-	leaq	LG_CPU_regs(%r11), %rsp
+	//TODO - I can't get registers without a pointer to lg_cpu struct
+    //leaq	LG_CPU_regs(%r11), %rsp
 	/* clear the faulted flag */
     movq    $LG_CPU_ANYFAULT_FL, %r10
     notq    %r10
@@ -666,7 +665,8 @@ fault_back_to_host:
 	 * updating the guest stack!
 	 */
 	/* were we kernel or userspace? */
-	leaq	LG_CPU_regs(%r11), %r9
+	//TODO - I can't get registers without a pointer to lg_cpu struct
+	//leaq	LG_CPU_regs(%r11), %r9
 	movq	LGUEST_REGS_cs(%r9), %rax
 	movq	%rax, %r12
 	movq	LGUEST_REGS_rsp(%r9), %r10
@@ -732,7 +732,8 @@ fault_back_to_host:
 	movq	%r15, 24(%rax)
 	movq	%r12, 16(%rax)
 
-	leaq	LG_CPU_regs(%r11), %r10
+	//TODO - I can't get registers without a pointer to lg_cpu struct
+	//leaq	LG_CPU_regs(%r11), %r10
 	/* r10 now holds a pointer to regs */
 
 	movq	LGUEST_REGS_rip(%r10), %r9
@@ -993,7 +994,8 @@ sys_ret:
 
 	/* The guest saved the original rax and rdx on it's stack */
 
-	leaq	LG_CPU_regs(%r11), %r10
+	//TODO - I can't get registers without a pointer to lg_cpu struct
+	//leaq	LG_CPU_regs(%r11), %r10
 	movq	LGUEST_REGS_rsp(%r10), %r9
 
 	/* we may fault here, but that's ok, we'll handle it */
@@ -1062,7 +1064,8 @@ decode_idt_and_jmp:
 	 * will return to run_guest_once.  This is a feature. */
 	/* We told gcc we'd clobber rdi and rax... */
 	/* rdi here also holds the vcpu struct (host version) */
-	movq    LG_CPU_regs(%rdi), %rdi
+	//TODO - I can't get registers without a pointer to lg_cpu struct
+	//movq    LG_CPU_regs(%rdi), %rdi
 	movq	LG_CPU_trapnum(%rdi), %rdi
 	shl	$1, %rdi
 	leaq	(%rax,%rdi,8), %rdi
@@ -1136,7 +1139,8 @@ lguest_syscall_trampoline:
 #endif
 
 	/* Lets give ourselves some playing area */
-	addq	$LG_CPU_regs, %rsp
+	//TODO - I can't get registers without a pointer to lg_cpu struct
+	//addq	$LG_CPU_regs, %rsp
 
 	/* do the swapgs if requested */
 	testq	$LG_CPU_SWAPGS_FL, LG_CPU_DATA_flags(%rax)
@@ -1185,7 +1189,8 @@ handle_hcall:
     /*should do something here*/
 
 	/* Update us like if we are comming from a trap. */
-	addq	$LG_CPU_regs, %rsp
+	//TODO - I can't get registers without a pointer to lg_cpu struct
+	//addq	$LG_CPU_regs, %rsp
 	addq	$LGUEST_REGS_size, %rsp
 	/* Hypercalls only come from kernel */
 	pushq	$(__KERNEL_DS | 1)
@@ -1542,7 +1547,8 @@ double_fault_safe:
 	/* now copy the regs to the proper place */
 	cld
 	movq	%rdi,  %rbx   /* save off vcpu struct */
-	leaq	LG_CPU_regs(%rdi), %rdi
+	//TODO - I can't get registers without a pointer to lg_cpu struct
+	//leaq	LG_CPU_regs(%rdi), %rdi
 	addq	$8, %rdi /* don't count the cr3 */
 	leaq	0(%rsp), %rsi
     pushq   %rax /* NOT sure it is really necessary */
@@ -1559,7 +1565,8 @@ double_fault_safe:
 	PRINT_QUAD(%rdi);
 
 	/* now mov the rsp to the copied location and we are all set */
-	leaq	LG_CPU_regs(%rdi), %rbx
+	//TODO - I can't get registers without a pointer to lg_cpu struct
+	//leaq	LG_CPU_regs(%rdi), %rbx
 	addq	$8, %rbx /* don't count the cr3 */
 	movq	%rbx, %rsp
 
@@ -1570,7 +1577,8 @@ double_fault_safe:
 	PRINT_L('F');
 	/* Point rdi to the vcpu struct */				\
 	movq	%rsp, %rdi;						\
-	subq	$LG_CPU_regs, %rdi;				\
+	//TODO - I can't get registers without a pointer to lg_cpu struct
+	//subq	$LG_CPU_regs, %rdi;				\
 	PRINT_L('G');
 	PRINT_QUAD(%rdi);
 	/* Load lguest ds segment for convenience. */			\

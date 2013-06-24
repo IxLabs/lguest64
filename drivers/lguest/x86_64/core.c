@@ -67,6 +67,10 @@ int lg_cpu_data_pages;
 int lg_cpu_data_order;
 unsigned long lg_cpu_data_addr;
 
+int lg_cpu_regs_pages;
+int lg_cpu_regs_order;
+unsigned long lg_cpu_regs_addr;
+
 /* used for nmi stack */
 static unsigned long lguest_nmi_playground;
 
@@ -573,10 +577,7 @@ static void run_guest_once(struct lg_cpu *cpu)
 	/* stats */
 	lguest_stat_start_time(cpu);
 
-    printk("***Give control to guest***\n");
-	asm volatile ("pushq %2; pushq %%rsp; pushfq; pushq %3; call *%6;"
-		      /* The stack we pushed is off by 8, due to the previous pushq */
-		      "addq $8, %%rsp"
+	asm volatile ("mov %%rsp, %%rax; pushq %2; pushq %%rax; pushfq; pushq %3; call *%6;"
 		      : "=D"(foo), "=a"(bar)
 		      : "i" (__KERNEL_DS), "i" (__KERNEL_CS), "0" (cpu->cpu),
 			"1"(get_idt_table()),
@@ -851,8 +852,14 @@ int init(void)
 	lg_cpu_data_order = order;
 	lg_cpu_data_pages = pages;
 
+	pages = (sizeof(struct lguest_regs)+(PAGE_SIZE-1))/PAGE_SIZE;
+	for (order = 0; (1<<order) < pages; order++)
+		;
+	lg_cpu_regs_order = order;
+	lg_cpu_regs_pages = pages;
+
 	/* get the total pages */
-	pages = lguest_hv_pages + lg_cpu_pages + lg_cpu_data_pages;
+	pages = lguest_hv_pages + lg_cpu_pages + lg_cpu_data_pages + lg_cpu_regs_pages;
 
 	/*
 	 * We need to allocate a 2M range (aligned by 2M).
@@ -943,6 +950,8 @@ int init(void)
 	lg_cpu_data_addr = lg_cpu_addr + (PAGE_SIZE * lg_cpu_pages);
 	printk("hv vcpu guest data =\t%lx\n", lg_cpu_data_addr);
 
+	lg_cpu_regs_addr = lg_cpu_data_addr + (PAGE_SIZE * lg_cpu_data_pages);
+	printk("hv vcpu regs data =\t%lx\n", lg_cpu_regs_addr);
 	/*
 	 * God how I hate the NMI!
 	 * In the switch code, there's a race where we set up the
@@ -967,9 +976,7 @@ int init(void)
 	if (ret < 0)
 		goto out;
 
-    //FIXME - Functia exista in io.c, dar mi se pare ca acolo
-    //e prea mult DMA si se poate sa renunt la fisier
-	//lguest_io_init();
+	lguest_io_init();
 	INIT_LIST_HEAD(&lguests);
 
     /* Setup LGUEST segments on all cpus */
@@ -1008,12 +1015,6 @@ int init(void)
 
 	/* Now update the LSTAR register on all CPUS */
 	update_star(NULL);
-
-	//TODO I am not sure this call does the right thing because
-	//this function was called with four parameters
-	//
-	//On linux 2.6.XX it still had three params
-	//smp_call_function(update_star, NULL, 0, 1);
 	smp_call_function(update_star, NULL, 1);
 
 	lguest_stat_init();

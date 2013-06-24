@@ -1723,7 +1723,7 @@ void guest_new_pagetable(struct lg_cpu *cpu, u64 cr3)
 
 	mutex_lock(&lg->page_lock);
 
-	lgdebug_lprint(LGD_PG_FL, "assign new pgd vcpu=%p oldpgd=%p cr3=%llx\n",
+	lgdebug_lprint("assign new pgd vcpu=%p oldpgd=%p cr3=%llx\n",
 		       cpu, cpu->pgd, cr3);
 
 	/* see if the cr3 already exists. */
@@ -1773,7 +1773,7 @@ void guest_new_pagetable(struct lg_cpu *cpu, u64 cr3)
 	cpu->pgd = pgd;
 	cpu->pgd->flags |= LGUEST_PGD_BUSY_FL;
 
-	lgdebug_lprint(LGD_PG_FL, "  new pgd=%p\n", pgd);
+	lgdebug_lprint("new pgd=%p\n", pgd);
 
 out:
 	mutex_unlock(&lg->page_lock);
@@ -2141,6 +2141,21 @@ static void lguest_pte_map_vcpu_guest_data(struct lg_cpu *cpu, u64 *ptr, int pro
 	daddr = lg_cpu_data_addr;
 	for (i=0; i < lg_cpu_data_pages; i++) {
 		/* vcpu guest data is mapped via get_free_pages */
+		page = __pa(vaddr + PAGE_SIZE*i);
+
+		/* Map it in as read/write and no execute. */
+		idx = pte_index(daddr+PAGE_SIZE*i);
+		set_pt(ptr[idx], page | prot);
+	}
+
+    /*
+     * And don't forget about the stack - it will point to
+     * regs page
+     */
+    vaddr = (unsigned long) cpu->regs_page;
+    daddr = lg_cpu_regs_addr;
+	for (i=0; i < lg_cpu_regs_pages; i++) {
+		/* vcpu guest regs is mapped via get_free_pages */
 		page = __pa(vaddr + PAGE_SIZE*i);
 
 		/* Map it in as read/write and no execute. */

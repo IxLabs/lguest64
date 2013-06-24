@@ -52,46 +52,9 @@
 static bool ignored_gdt(unsigned int num)
 {
 	return (num == GDT_ENTRY_TSS
-/*		|| num == GDT_ENTRY_LGUEST_CS
-		|| num == GDT_ENTRY_LGUEST_DS
-  */      );
-}
-
-/*H:630
- * Once the Guest gave us new GDT entries, we fix them up a little.  We
- * don't care if they're invalid: the worst that can happen is a General
- * Protection Fault in the Switcher when it restores a Guest segment register
- * which tries to use that entry.  Then we kill the Guest for causing such a
- * mess: the message will be "unhandled trap 256".
- */
-static void fixup_gdt_table(struct lg_cpu *cpu, unsigned start, unsigned end)
-{
-	unsigned int i;
-
-	for (i = start; i < end; i++) {
-		/*
-		 * We never copy these ones to real GDT, so we don't care what
-		 * they say
-		 */
-		if (ignored_gdt(i))
-			continue;
-
-		/*
-		 * Segment descriptors contain a privilege level: the Guest is
-		 * sometimes careless and leaves this as 0, even though it's
-		 * running at privilege level 1.  If so, we fix it here.
-		 */
-		//if (cpu->arch.gdt[i].dpl == 0)
-		//	cpu->arch.gdt[i].dpl |= GUEST_PL;
-
-		/*
-		 * Each descriptor has an "accessed" bit.  If we don't set it
-		 * now, the CPU will try to set it when the Guest first loads
-		 * that entry into a segment register.  But the GDT isn't
-		 * writable by the Guest, so bad things can happen.
-		 */
-		//cpu->arch.gdt[i].type |= 0x1;
-	}
+		|| num == GDT_ENTRY_LGUEST_HV_CS
+		|| num == GDT_ENTRY_LGUEST_HV_DS
+        );
 }
 
 /*H:610
@@ -136,9 +99,9 @@ void copy_gdt(const struct lg_cpu *cpu, struct desc_struct *gdt)
 	 * The default entries from setup_default_gdt_entries() are not
 	 * replaced.  See ignored_gdt() above.
 	 */
-	//for (i = 0; i < GDT_ENTRIES; i++)
-	//	if (!ignored_gdt(i))
-	//		gdt[i] = cpu->arch.gdt[i];
+	for (i = 0; i < GDT_ENTRIES; i++)
+		if (!ignored_gdt(i))
+			gdt[i] = cpu->arch.gdt[i];
 }
 
 /*H:620
@@ -151,14 +114,14 @@ void load_guest_gdt_entry(struct lg_cpu *cpu, u32 num, u32 lo, u32 hi)
 	 * We assume the Guest has the same number of GDT entries as the
 	 * Host, otherwise we'd have to dynamically allocate the Guest GDT.
 	 */
-	//if (num >= ARRAY_SIZE(cpu->arch.gdt)) {
-	//	kill_guest(cpu, "too many gdt entries %i", num);
-	//	return;
-	//}
+	if (num >= ARRAY_SIZE(cpu->arch.gdt)) {
+		//kill_guest(cpu, "too many gdt entries %i", num);
+		return;
+	}
 
 	/* Set it up, then fix it. */
-	//cpu->arch.gdt[num].a = lo;
-	//cpu->arch.gdt[num].b = hi;
+	cpu->arch.gdt[num].a = lo;
+	cpu->arch.gdt[num].b = hi;
 	//fixup_gdt_table(cpu, num, num+1);
 	/*
 	 * Mark that the GDT changed so the core knows it has to copy it again,
